@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-snapshot-pipeline"
+version = "0.1.0"
+description = "Production pipeline for extracting data snapshots and metadata"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=11,<13",
+    "pymupdf>=1.25,<2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9,<10",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
