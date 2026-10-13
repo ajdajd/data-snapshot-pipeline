@@ -67,7 +67,7 @@ uv run python -m data_snapshot_pipeline \
 
 ### Snapshot extraction only
 
-Run the selected extractor without making an OpenAI API request:
+Run the selected extractor without making a metadata API request:
 
 ```bash
 uv run python -m data_snapshot_pipeline.extract_data_snapshot \
@@ -182,13 +182,42 @@ extractor contract.
 
 Metadata extraction sends each snapshot image to the OpenAI Responses API and
 validates the structured response against the canonical Pydantic Schema v1.4
-model. The request uses only image-visible evidence; filenames, directory names,
-and source-document metadata are not included as evidence.
+model. The default model is `gpt-5.6-luna`. The request uses only image-visible
+evidence; filenames, directory names, and source-document metadata are not
+included as evidence.
 
 Default request settings are in
 `src/data_snapshot_pipeline/metadata_extraction/config/default.json`. Prompt
 files are in the adjacent `prompts/` directory. API calls have automatic SDK
 retries disabled so a failed call is not silently repeated.
+
+### Using OpenRouter
+
+OpenRouter is supported through its OpenAI-compatible Responses API. Add its key
+to `.env`:
+
+```dotenv
+OPENROUTER_API_KEY=your-api-key
+```
+
+Then change `default.json` to use an OpenRouter model that supports image input
+and Structured Outputs through the Responses API:
+
+```json
+{
+  "provider": "openrouter",
+  "model": "provider/model",
+  "max_output_tokens": 25000,
+  "timeout": 900.0
+}
+```
+
+OpenRouter model capabilities and free-tier availability vary by endpoint.
+Confirm support for both image input and `structured_outputs` in the
+[OpenRouter model catalog](https://openrouter.ai/models) before selecting a
+model. Remove OpenAI-specific settings such as `service_tier`,
+`prompt_cache_key`, and `reasoning.effort` unless the selected endpoint
+explicitly supports them.
 
 ## Troubleshooting
 
@@ -197,9 +226,9 @@ retries disabled so a failed call is not silently repeated.
 - **TF-ID prints `timm` or `GenerationMixin` warnings:** these are upstream
   compatibility warnings from the pinned TF-ID dependency stack. If extraction
   completes and prints a snapshot path, the run succeeded.
-- **The API returns HTTP 429 with `insufficient_quota`:** the API key has no
-  available credits. Add credits, then retry with the metadata-only command so
-  the extractor does not run again.
+- **The API returns HTTP 429:** free-model rate limits or paid-provider quota may
+  be exhausted. Retry later or add credits, then use the metadata-only command
+  so the snapshot extractor does not run again.
 - **A PDF is skipped:** matching outputs already exist. Keep them, or rerun the
   PDF command with `--force` to rebuild both stages.
 

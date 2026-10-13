@@ -28,10 +28,12 @@ _PIPELINE_OWNED_CONFIG_FIELDS = {
     "input",
     "instructions",
     "model",
+    "provider",
     "stream",
     "text",
     "text_format",
 }
+_SUPPORTED_PROVIDERS = {"openai", "openrouter"}
 _UNSUPPORTED_SCHEMA_KEYWORDS = {
     "$schema",
     "allOf",
@@ -100,12 +102,13 @@ class ExtractionResult:
 def load_extraction_config(
     config_path: str | Path = _DEFAULT_CONFIG_PATH,
 ) -> dict[str, Any]:
-    """Load Responses API settings from a JSON object.
+    """Load metadata API settings from a JSON object.
 
     Parameters
     ----------
     config_path : str | Path, optional
-        JSON file containing ``model`` and optional Responses API settings.
+        JSON file containing ``model``, an optional ``provider``, and API
+        settings.
 
     Returns
     -------
@@ -125,7 +128,10 @@ def load_extraction_config(
     model = config.get("model")
     if not isinstance(model, str) or not model.strip():
         raise ValueError("Extraction config requires a non-empty 'model' string.")
-    forbidden = (set(config) - {"model"}) & _PIPELINE_OWNED_CONFIG_FIELDS
+    provider = config.get("provider", "openai")
+    if provider not in _SUPPORTED_PROVIDERS:
+        raise ValueError("Extraction config provider must be 'openai' or 'openrouter'.")
+    forbidden = (set(config) - {"model", "provider"}) & (_PIPELINE_OWNED_CONFIG_FIELDS)
     if forbidden:
         raise ValueError(
             f"Extraction config cannot set pipeline-owned keys: {sorted(forbidden)}."
@@ -163,12 +169,13 @@ def extract_metadata(
     try:
         config = load_extraction_config(config_path)
         model = config.pop("model")
+        provider = config.pop("provider", "openai")
         system_prompt = _read_prompt(
             "system.md", _COMPLETENESS_PLACEHOLDER, _COMPLETENESS_GUIDANCE
         )
         user_prompt = _read_prompt("user.md", _SCHEMA_PLACEHOLDER, "")
         image_url = _image_data_url(image_path)
-        api_client = client if client is not None else _create_openai_client()
+        api_client = client if client is not None else _create_api_client(provider)
 
         started_at = time.perf_counter()
         response = api_client.responses.create(
@@ -198,7 +205,9 @@ def extract_metadata(
             reason = (incomplete_details or {}).get("reason", "unknown reason")
             raise ValueError(f"Response was incomplete: {reason}.")
         if status not in {None, "completed"}:
-            raise ValueError(f"Response ended with status: {status}.")
+            detail = _api_error_text(getattr(response, "error", None))
+            suffix = f" ({detail})" if detail else ""
+            raise ValueError(f"Response ended with status: {status}{suffix}.")
         raw_output = getattr(response, "output_text", None)
         if not isinstance(raw_output, str) or not raw_output:
             raise ValueError("Structured output was missing.")
@@ -335,16 +344,38 @@ def _response_format() -> dict[str, Any]:
     }
 
 
-def _create_openai_client() -> Any:
-    """Create an OpenAI client with automatic retries disabled."""
+def _create_api_client(provider: str) -> Any:
+    """Create the configured API client with automatic retries disabled.
+
+    Parameters
+    ----------
+    provider : str
+        Supported API provider name.
+
+    Returns
+    -------
+    Any
+        Configured OpenAI-compatible SDK client.
+
+    Raises
+    ------
+    ValueError
+        If the selected provider's API key is not set.
+    """
     from dotenv import load_dotenv
     from openai import OpenAI
 
     load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+    if provider == "openrouter":
+        api_key_name = "OPENROUTER_API_KEY"
+        base_url = "https://openrouter.ai/api/v1"
+    else:
+        api_key_name = "OPENAI_API_KEY"
+        base_url = None
+    api_key = os.getenv(api_key_name)
     if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set.")
-    return OpenAI(api_key=api_key, max_retries=0)
+        raise ValueError(f"{api_key_name} is not set.")
+    return OpenAI(api_key=api_key, base_url=base_url, max_retries=0)
 
 
 def _serialize_api_value(value: Any) -> dict[str, Any] | None:
@@ -365,3 +396,17 @@ def _serialize_api_value(value: Any) -> dict[str, Any] | None:
         )
         if hasattr(value, key)
     }
+
+
+def _api_error_text(value: Any) -> str | None:
+    """Return an API error code and message suitable for CLI output."""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        code = value.get("code")
+        message = value.get("message")
+    else:
+        code = getattr(value, "code", None)
+        message = getattr(value, "message", None)
+    detail = ": ".join(str(item) for item in (code, message) if item)
+    return detail or str(value)

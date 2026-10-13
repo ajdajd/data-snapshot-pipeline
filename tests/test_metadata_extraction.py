@@ -4,9 +4,14 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from data_snapshot_pipeline import DataSnapshotMetadata, extract_metadata
 from data_snapshot_pipeline.metadata_extraction import load_extraction_config
-from data_snapshot_pipeline.metadata_extraction.extraction import _response_format
+from data_snapshot_pipeline.metadata_extraction.extraction import (
+    _create_api_client,
+    _response_format,
+)
 
 
 class _FakeResponses:
@@ -36,14 +41,40 @@ def _write_config(path: Path, **overrides: object) -> None:
     path.write_text(json.dumps(config), encoding="utf-8")
 
 
-def test_default_config_preserves_research_runtime_settings() -> None:
-    """Use the current configured model and output budget."""
+def test_default_config_uses_openai_luna() -> None:
+    """Use the OpenAI Luna model and research runtime settings by default."""
     config = load_extraction_config()
 
+    assert config["provider"] == "openai"
     assert config["model"] == "gpt-5.6-luna"
     assert config["max_output_tokens"] == 25_000
     assert config["service_tier"] == "flex"
     assert config["reasoning"] == {"effort": "medium"}
+
+
+def test_openrouter_client_uses_compatible_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Point the existing OpenAI SDK at OpenRouter with its own API key."""
+    import openai
+
+    arguments: dict[str, object] = {}
+
+    def fake_openai(**kwargs: object) -> object:
+        """Record SDK client configuration."""
+        arguments.update(kwargs)
+        return object()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openai, "OpenAI", fake_openai)
+
+    _create_api_client("openrouter")
+
+    assert arguments == {
+        "api_key": "test-key",
+        "base_url": "https://openrouter.ai/api/v1",
+        "max_retries": 0,
+    }
 
 
 def test_extract_metadata_uses_image_and_validates_output(tmp_path: Path) -> None:
@@ -127,6 +158,38 @@ def test_incomplete_response_preserves_details_without_parsing(tmp_path: Path) -
     assert result.raw_output == '{"title": "truncated'
 
 
+def test_failed_response_reports_api_error(tmp_path: Path) -> None:
+    """Include the provider's failure code and message in the result."""
+    image_path = tmp_path / "snapshot.png"
+    config_path = tmp_path / "config.json"
+    _write_image(image_path)
+    _write_config(config_path)
+    response = SimpleNamespace(
+        id="resp_failed",
+        status="failed",
+        incomplete_details=None,
+        output_text="",
+        usage=None,
+        error=SimpleNamespace(
+            code="provider_error",
+            message="Structured output was rejected.",
+        ),
+    )
+
+    result = extract_metadata(
+        image_path,
+        config_path=config_path,
+        client=SimpleNamespace(responses=_FakeResponses(response)),
+    )
+
+    assert result.metadata is None
+    assert result.api_status == "failed"
+    assert result.error == (
+        "Response ended with status: failed "
+        "(provider_error: Structured output was rejected.)."
+    )
+
+
 def test_config_rejects_pipeline_owned_fields(tmp_path: Path) -> None:
     """Prevent config files from replacing prompts, input, or output schema."""
     config_path = tmp_path / "config.json"
@@ -138,3 +201,16 @@ def test_config_rejects_pipeline_owned_fields(tmp_path: Path) -> None:
         assert "'input'" in str(error)
     else:
         raise AssertionError("Pipeline-owned input config was accepted.")
+
+
+def test_config_rejects_unknown_provider(tmp_path: Path) -> None:
+    """Reject provider names without a configured client endpoint."""
+    config_path = tmp_path / "config.json"
+    _write_config(config_path, provider="unknown")
+
+    try:
+        load_extraction_config(config_path)
+    except ValueError as error:
+        assert "provider" in str(error)
+    else:
+        raise AssertionError("Unknown metadata provider was accepted.")
