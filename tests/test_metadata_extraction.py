@@ -1,0 +1,140 @@
+"""Test Schema v1.4 single-snapshot metadata extraction offline."""
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+from data_snapshot_pipeline import DataSnapshotMetadata, extract_metadata
+from data_snapshot_pipeline.metadata_extraction import load_extraction_config
+from data_snapshot_pipeline.metadata_extraction.extraction import _response_format
+
+
+class _FakeResponses:
+    """Record Responses API requests and return a configured result."""
+
+    def __init__(self, response: object | Exception) -> None:
+        self.response = response
+        self.request: dict[str, object] | None = None
+
+    def create(self, **arguments: object) -> object:
+        """Record a request and return or raise the configured result."""
+        self.request = arguments
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
+def _write_image(path: Path) -> None:
+    """Write a minimal file accepted as a PNG input."""
+    path.write_bytes(b"png-data")
+
+
+def _write_config(path: Path, **overrides: object) -> None:
+    """Write a minimal extraction configuration."""
+    config: dict[str, object] = {"model": "test-model", "max_output_tokens": 25_000}
+    config.update(overrides)
+    path.write_text(json.dumps(config), encoding="utf-8")
+
+
+def test_default_config_preserves_research_runtime_settings() -> None:
+    """Use the current configured model and output budget."""
+    config = load_extraction_config()
+
+    assert config["model"] == "gpt-5.6-luna"
+    assert config["max_output_tokens"] == 25_000
+    assert config["service_tier"] == "flex"
+    assert config["reasoning"] == {"effort": "medium"}
+
+
+def test_extract_metadata_uses_image_and_validates_output(tmp_path: Path) -> None:
+    """Send one image with a strict schema and validate the returned metadata."""
+    image_path = tmp_path / "secret_source_table_000.png"
+    config_path = tmp_path / "config.json"
+    _write_image(image_path)
+    _write_config(config_path)
+    metadata = DataSnapshotMetadata(title="Displacement by year")
+    responses = _FakeResponses(
+        SimpleNamespace(
+            id="resp_test",
+            status="completed",
+            incomplete_details=None,
+            output_text=metadata.model_dump_json(),
+            usage=SimpleNamespace(input_tokens=12, output_tokens=4, total_tokens=16),
+        )
+    )
+
+    result = extract_metadata(
+        image_path,
+        config_path=config_path,
+        client=SimpleNamespace(responses=responses),
+    )
+
+    assert result.metadata == metadata
+    assert result.error is None
+    assert responses.request is not None
+    assert responses.request["text"]["format"] == _response_format()
+    request_input = responses.request["input"]
+    prompt_text = " ".join(
+        item["text"]
+        for message in request_input
+        for item in message["content"]
+        if item["type"] == "input_text"
+    )
+    assert image_path.name not in prompt_text
+    assert request_input[1]["content"][1]["image_url"].startswith(
+        "data:image/png;base64,"
+    )
+
+
+def test_response_format_is_strict_and_openai_compatible() -> None:
+    """Generate Structured Outputs from the canonical Pydantic model."""
+    response_format = _response_format()
+    schema = response_format["schema"]
+    serialized = json.dumps(schema)
+
+    assert response_format["type"] == "json_schema"
+    assert response_format["strict"] is True
+    assert schema["required"] == list(schema["properties"])
+    for unsupported in ("allOf", "else", "if", "not", "then"):
+        assert f'"{unsupported}"' not in serialized
+    assert "Validation rules:" in serialized
+
+
+def test_incomplete_response_preserves_details_without_parsing(tmp_path: Path) -> None:
+    """Report output-budget truncation before attempting Pydantic parsing."""
+    image_path = tmp_path / "snapshot.png"
+    config_path = tmp_path / "config.json"
+    _write_image(image_path)
+    _write_config(config_path)
+    response = SimpleNamespace(
+        id="resp_incomplete",
+        status="incomplete",
+        incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+        output_text='{"title": "truncated',
+        usage=None,
+    )
+
+    result = extract_metadata(
+        image_path,
+        config_path=config_path,
+        client=SimpleNamespace(responses=_FakeResponses(response)),
+    )
+
+    assert result.metadata is None
+    assert result.api_status == "incomplete"
+    assert result.incomplete_details == {"reason": "max_output_tokens"}
+    assert result.error == "Response was incomplete: max_output_tokens."
+    assert result.raw_output == '{"title": "truncated'
+
+
+def test_config_rejects_pipeline_owned_fields(tmp_path: Path) -> None:
+    """Prevent config files from replacing prompts, input, or output schema."""
+    config_path = tmp_path / "config.json"
+    _write_config(config_path, input=[])
+
+    try:
+        load_extraction_config(config_path)
+    except ValueError as error:
+        assert "'input'" in str(error)
+    else:
+        raise AssertionError("Pipeline-owned input config was accepted.")

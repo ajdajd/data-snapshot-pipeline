@@ -30,6 +30,10 @@ doclayoutyolo = [
     "doclayout-yolo==0.0.4",
     "huggingface-hub>=0.23,<2",
 ]
+metadata = [
+    "openai>=2.53,<3",
+    "python-dotenv>=1,<2",
+]
 tfid = [
     "accelerate>=1,<2",
     "einops>=0.8,<1",
@@ -40,6 +44,9 @@ tfid = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"data_snapshot_pipeline.metadata_extraction" = ["config/*.json", "prompts/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
