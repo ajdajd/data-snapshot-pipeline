@@ -61,7 +61,7 @@ def test_extract_snapshots_skips_existing_pdf(
 
     paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeAdapter(), dpi=72)
 
-    assert paths == []
+    assert paths == [existing]
     assert existing.read_bytes() == b"keep"
     assert f"Skipping {pdf_path}: existing snapshots found" in capsys.readouterr().out
 

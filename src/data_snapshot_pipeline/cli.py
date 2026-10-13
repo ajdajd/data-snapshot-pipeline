@@ -1,9 +1,9 @@
-"""Provide the command-line interface for snapshot extraction."""
+"""Provide the command-line interface for snapshot and metadata extraction."""
 
 import argparse
 from pathlib import Path
 
-from data_snapshot_pipeline.pipeline import run_extraction
+from data_snapshot_pipeline.pipeline import run_pipeline
 
 
 def _positive_int(value: str) -> int:
@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(
         prog="python -m data_snapshot_pipeline",
-        description="Extract snapshots from PDFs.",
+        description="Extract snapshots and optional metadata from PDFs.",
     )
     parser.add_argument(
         "--model",
@@ -64,19 +64,25 @@ def main(argv: list[str] | None = None) -> int:
         "-f",
         "--force",
         action="store_true",
-        help="Replace existing snapshots for each input PDF.",
+        help="Replace existing outputs for each input PDF.",
+    )
+    parser.add_argument(
+        "--with-metadata",
+        action="store_true",
+        help="Extract Schema v1.4 metadata for each snapshot.",
     )
     args = parser.parse_args(argv)
 
     try:
-        paths = run_extraction(
+        paths = run_pipeline(
             args.input,
             args.output_dir,
             args.model,
             dpi=args.dpi,
             force=args.force,
+            with_metadata=args.with_metadata,
         )
-    except (FileExistsError, FileNotFoundError, ValueError) as error:
+    except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
     for path in paths:

@@ -37,7 +37,7 @@ def extract_snapshots(
     Returns
     -------
     list[Path]
-        Snapshot image paths in document, page, and spatial order.
+        Available snapshot image paths in document, page, and spatial order.
 
     Raises
     ------
@@ -59,6 +59,7 @@ def extract_snapshots(
                 f"Skipping {pdf_path}: existing snapshots found in "
                 f"{snapshots_dir} (use --force to replace)."
             )
+            output_paths.extend(existing_paths)
             continue
         for existing_path in existing_paths:
             existing_path.unlink()
