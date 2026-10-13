@@ -11,7 +11,7 @@ Install the locked base environment and test tools:
 uv sync --locked --extra test
 ```
 
-Add only the model or metadata extras needed for the work. For example:
+Add only the extractor or metadata extras needed for the work. For example:
 
 ```bash
 uv sync --locked --extra test --extra tfid --extra metadata
@@ -27,8 +27,8 @@ Git-ignored `.env`, `.cache/`, `data/`, and `output/` paths.
 - Use Python 3.10+ type hints on every function signature.
 - Use NumPy-style docstrings for public modules, classes, and functions.
 - Follow PEP 8 naming conventions.
-- Preserve lazy adapter imports so running one model does not require every
-  model dependency.
+- Preserve lazy extractor imports so running one extractor does not require
+  every extractor dependency.
 - Keep tests offline by injecting fake model, processor, or API clients.
 
 ## Verification
@@ -50,9 +50,9 @@ git diff --check
 Do not use a live metadata request as an automated test. When a manual smoke
 test is necessary, state that it consumes API credits before running it.
 
-## Adding a layout adapter
+## Adding a data snapshot extractor
 
-Use the shipped `create-adapter` skill to apply this repository's adapter
+Use the shipped `create-adapter` skill to apply this repository's extractor
 conventions:
 
 ```text
@@ -61,10 +61,10 @@ $create-adapter for {github_link}
 
 The skill source is `.agents/skills/create-adapter/SKILL.md`.
 
-Whether using the skill or working manually, an adapter change must:
+Whether using the skill or working manually, an extractor integration must:
 
 1. Add `src/data_snapshot_pipeline/adapters/<model_name>.py` with typed,
-   NumPy-documented configuration and adapter classes.
+   NumPy-documented configuration and implementation classes.
 2. Use medium model weights unless the project explicitly chooses another
    size, and cache downloaded weights beneath `.cache/models/`.
 3. Convert model output to canonical `Detection` objects. Only `figure` and
@@ -72,15 +72,16 @@ Whether using the skill or working manually, an adapter change must:
    inclusive unit interval.
 4. Add a lazy branch to `create_adapter()` in
    `src/data_snapshot_pipeline/adapters/__init__.py`.
-5. Add a model-specific optional dependency group to `pyproject.toml` and
+5. Add an extractor-specific optional dependency group to `pyproject.toml` and
    update `uv.lock` if new dependencies are required.
 6. Add offline tests with an injected fake model. Tests must cover label
    mapping, normalized coordinates, thresholds, and invalid configuration.
-7. Add the model identifier, dependency extra, weights, and inference size to
-   the table in `README.md`.
+7. Add the extractor identifier, dependency extra, weights, and inference size
+   to the table in `README.md`.
 
-Do not add a new CLI entry point for each model. The existing PDF commands take
-exactly one model through `--model=<model_name>`.
+`LayoutAdapter` is the internal Python protocol for snapshot extractors. Do not
+add a new CLI entry point for each extractor; the existing PDF commands select
+exactly one through `--model=<model_name>`.
 
 ## Pull request checklist
 
@@ -90,4 +91,4 @@ exactly one model through `--model=<model_name>`.
 - `uv run pytest -q`, `uv lock --check`, and `git diff --check` pass.
 - Tests do not download weights or call paid APIs.
 - User-owned files under `.env`, `data/`, and `output/` remain untouched.
-- Documentation reflects any changed command, output, dependency, or adapter.
+- Documentation reflects any changed command, output, dependency, or extractor.

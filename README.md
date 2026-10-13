@@ -3,8 +3,9 @@
 Extract figure and table snapshots from PDFs, then extract validated Schema v1.4
 metadata from those images.
 
-The pipeline runs one layout model per invocation. Snapshot extraction and
-metadata extraction can be run independently or as one end-to-end command.
+The pipeline runs one data snapshot extractor per invocation. Snapshot
+extraction and metadata extraction can run independently or as one end-to-end
+command.
 Submission to an external dataset or service is not implemented yet.
 
 ## Requirements
@@ -15,16 +16,16 @@ Submission to an external dataset or service is not implemented yet.
 
 ## Installation
 
-Install only the layout model needed for a run. For example, to use TF-ID with
-metadata extraction and the development tools:
+Install only the extractor needed for a run. For example, to use TF-ID with
+metadata extraction:
 
 ```bash
-uv sync --locked --extra tfid --extra metadata --extra test
+uv sync --locked --extra tfid --extra metadata
 ```
 
-Replace `tfid` with one of the other layout extras when needed:
+Replace `tfid` with another extractor extra when needed:
 
-| CLI model | Dependency extra | Model weights | Inference size |
+| Extractor | Dependency extra | Model weights | Inference size |
 | --- | --- | --- | ---: |
 | `tfid` | `tfid` | `yifeihu/TF-ID-large` | Model-defined |
 | `doclayoutyolo` | `doclayoutyolo` | `juliozhao/DocLayout-YOLO-DocStructBench` | 1024 |
@@ -47,55 +48,10 @@ OPENAI_API_KEY=your-api-key
 
 Both `.env` and the model cache are excluded from Git.
 
-## Model selection
-
-The following results are from *Benchmarking Open-Source Layout Detection
-Models for Data Snapshot Extraction from Institutional Documents*. They measure
-both detection and the spatial quality of matched crops across all documents in
-the benchmark.
-
-### Figures
-
-| Category | Metric | TF-ID-Large | DocLayout-YOLO | YOLOv11 medium | YOLOv26 medium |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Detection | Precision | **0.628** | 0.547 | 0.378 | 0.388 |
-|  | Recall | 0.488 | **0.802** | 0.761 | 0.721 |
-| Spatial accuracy | IoU | **0.877** | 0.820 | 0.817 | 0.817 |
-|  | Area precision | 0.935 | **0.996** | 0.990 | 0.990 |
-|  | Area recall | **0.938** | 0.824 | 0.826 | 0.826 |
-
-### Tables
-
-| Category | Metric | TF-ID-Large | DocLayout-YOLO | YOLOv11 medium | YOLOv26 medium |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Detection | Precision | **0.562** | 0.468 | 0.487 | 0.460 |
-|  | Recall | 0.861 | **0.893** | 0.862 | 0.891 |
-| Spatial accuracy | IoU | **0.919** | 0.834 | 0.817 | 0.824 |
-|  | Area precision | 0.972 | 0.993 | **0.994** | 0.994 |
-|  | Area recall | **0.946** | 0.841 | 0.822 | 0.829 |
-
-See the [benchmark paper](https://arxiv.org/abs/2606.06242) for
-the dataset, evaluation protocol, corpus-level results, and limitations.
-
-Choose based on the error profile that matters for the collection: precision
-penalizes irrelevant detections, recall measures missed snapshots, and the
-spatial metrics measure crop alignment and completeness. These aggregate
-results are reference baselines, not a guarantee for a different document
-collection.
-
-Other layout models can be integrated with the shipped `create-adapter` skill:
-
-```text
-$create-adapter for {github_link}
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-layout-adapter) for the adapter
-contract.
-
 ## Usage
 
 Place source PDFs beneath `data/`. Commands default to the repository-root
-`output/` directory and create a subdirectory for the selected model.
+`output/` directory and create a subdirectory for the selected extractor.
 
 ### End-to-end pipeline
 
@@ -109,7 +65,7 @@ uv run python -m data_snapshot_pipeline \
 
 ### Snapshot extraction only
 
-Run the layout model without making an OpenAI API request:
+Run the selected extractor without making an OpenAI API request:
 
 ```bash
 uv run python -m data_snapshot_pipeline.extract_data_snapshot \
@@ -119,7 +75,7 @@ uv run python -m data_snapshot_pipeline.extract_data_snapshot \
 
 ### Metadata extraction only
 
-Process all supported images under a model's snapshot directory:
+Process all supported images under an extractor's snapshot directory:
 
 ```bash
 uv run python -m data_snapshot_pipeline.extract_metadata \
@@ -162,15 +118,61 @@ Metadata files use the same stem as their snapshot.
 The PDF filename stem identifies all outputs belonging to that PDF.
 
 - Snapshot-only and end-to-end commands skip a PDF when any matching snapshot
-  or metadata file already exists. They do not load the layout model for a fully
+  or metadata file already exists. They do not load the extractor for a fully
   skipped run.
 - Adding `--force` to either PDF command deletes all matching snapshots and
   metadata before starting the replacement extraction.
 - Metadata-only extraction skips an image whose JSON output already exists.
   Adding `--force` replaces only that JSON file and preserves the image.
 
-Cleanup happens before replacement work begins. If model inference or an API
+Cleanup happens before replacement work begins. If extractor inference or an API
 request later fails, the removed outputs are not restored.
+
+## Model selection
+
+The following results are from *Benchmarking Open-Source Layout Detection
+Models for Data Snapshot Extraction from Institutional Documents*. They measure
+both detection and the spatial quality of matched crops across all documents in
+the benchmark.
+
+### Figures
+
+| Category | Metric | TF-ID-Large | DocLayout-YOLO | YOLOv11 medium | YOLOv26 medium |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Detection | Precision | **0.628** | 0.547 | 0.378 | 0.388 |
+|  | Recall | 0.488 | **0.802** | 0.761 | 0.721 |
+| Spatial accuracy | IoU | **0.877** | 0.820 | 0.817 | 0.817 |
+|  | Area precision | 0.935 | **0.996** | 0.990 | 0.990 |
+|  | Area recall | **0.938** | 0.824 | 0.826 | 0.826 |
+
+### Tables
+
+| Category | Metric | TF-ID-Large | DocLayout-YOLO | YOLOv11 medium | YOLOv26 medium |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Detection | Precision | **0.562** | 0.468 | 0.487 | 0.460 |
+|  | Recall | 0.861 | **0.893** | 0.862 | 0.891 |
+| Spatial accuracy | IoU | **0.919** | 0.834 | 0.817 | 0.824 |
+|  | Area precision | 0.972 | 0.993 | **0.994** | 0.994 |
+|  | Area recall | **0.946** | 0.841 | 0.822 | 0.829 |
+
+See the [benchmark paper](https://arxiv.org/abs/2606.06242) for the dataset,
+evaluation protocol, corpus-level results, and limitations.
+
+Choose based on the error profile that matters for the collection: precision
+penalizes irrelevant detections, recall measures missed snapshots, and the
+spatial metrics measure crop alignment and completeness. These aggregate
+results are reference baselines, not a guarantee for a different document
+collection.
+
+Other data snapshot extractors can be integrated with the shipped
+`create-adapter` skill:
+
+```text
+$create-adapter for {github_link}
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-data-snapshot-extractor) for the
+extractor contract.
 
 ## Metadata extraction
 
@@ -186,18 +188,18 @@ retries disabled so a failed call is not silently repeated.
 
 ## Troubleshooting
 
-- **The first model run is slow:** model weights are being downloaded. Later
+- **The first extractor run is slow:** model weights are being downloaded. Later
   runs reuse `.cache/models/`.
 - **TF-ID prints `timm` or `GenerationMixin` warnings:** these are upstream
   compatibility warnings from the pinned TF-ID dependency stack. If extraction
   completes and prints a snapshot path, the run succeeded.
 - **The API returns HTTP 429 with `insufficient_quota`:** the API key has no
   available credits. Add credits, then retry with the metadata-only command so
-  the layout model does not run again.
+  the extractor does not run again.
 - **A PDF is skipped:** matching outputs already exist. Keep them, or rerun the
   PDF command with `--force` to rebuild both stages.
 
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for coding standards, verification, and
-the adapter contribution workflow.
+the extractor contribution workflow.

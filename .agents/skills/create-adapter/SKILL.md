@@ -1,16 +1,16 @@
 ---
 name: create-adapter
-description: Add a document layout model adapter to the Data Snapshot Pipeline from a model repository, library, or implementation link. Use for a new figure and table detector, not metadata models or routine edits to an existing adapter.
+description: Add a data snapshot extractor to the Data Snapshot Pipeline from a model repository, library, or implementation link. Use for a new figure and table extractor, not metadata models or routine edits to an existing extractor.
 ---
 
 # Create Adapter
 
-Integrate one layout detector without changing the pipeline's canonical
+Integrate one data snapshot extractor without changing the pipeline's canonical
 extraction contract. Start from the supplied model or library link and reuse the
-closest existing adapter in `src/data_snapshot_pipeline/adapters/`.
+closest existing implementation in `src/data_snapshot_pipeline/adapters/`.
 
 Before implementation, inspect `src/data_snapshot_pipeline/detection.py`,
-`src/data_snapshot_pipeline/adapters/__init__.py`, the closest existing adapter
+`src/data_snapshot_pipeline/adapters/__init__.py`, the closest existing extractor
 and its tests, `pyproject.toml`, and the README model table.
 
 ## Establish the model contract
@@ -25,7 +25,7 @@ Use primary sources for the model and its inference library. Confirm:
 - confidence-score availability; and
 - license or remote-code requirements that affect use in this repository.
 
-State the proposed adapter name, checkpoint, dependencies, cache location, and
+State the proposed extractor name, checkpoint, dependencies, cache location, and
 user-run installation command. Ask only about unresolved choices that would
 materially change the integration.
 
@@ -37,9 +37,9 @@ Before installing dependencies or downloading weights, give the user the
 corresponding `uv` command to run in their terminal. Proceed with installation
 yourself only when the user asks you to.
 
-## Implement the adapter
+## Implement the extractor
 
-The adapter must satisfy `LayoutAdapter` from
+The extractor must satisfy the internal `LayoutAdapter` protocol from
 `src/data_snapshot_pipeline/detection.py`:
 
 ```python
@@ -56,9 +56,9 @@ Each returned `Detection` must contain:
 
 Ignore unsupported labels and invalid or undersized boxes. Use the existing
 minimum normalized area of `0.008` unless the model has a documented reason for
-another value. Clamp coordinates and scores at the adapter boundary.
+another value. Clamp coordinates and scores at the extractor boundary.
 
-Follow the existing adapter structure:
+Follow the existing implementation structure:
 
 1. Add `src/data_snapshot_pipeline/adapters/<model_name>.py`.
 2. Define model identifiers, filenames, and cache paths as module constants.
@@ -68,11 +68,11 @@ Follow the existing adapter structure:
 5. Keep imports for optional model libraries inside model-loading functions.
 6. Add a lazy branch to `create_adapter()` in
    `src/data_snapshot_pipeline/adapters/__init__.py`.
-7. Add a model-specific optional dependency group to `pyproject.toml` and
+7. Add an extractor-specific optional dependency group to `pyproject.toml` and
    update `uv.lock`.
 
-Do not add a model-specific CLI. Both PDF commands already select exactly one
-adapter through `--model=<model_name>`.
+Do not add an extractor-specific CLI. Both PDF commands already select exactly
+one extractor through `--model=<model_name>`.
 
 ## Test offline
 
