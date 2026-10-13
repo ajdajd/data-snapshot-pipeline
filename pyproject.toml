@@ -9,6 +9,7 @@ description = "Production pipeline for extracting data snapshots and metadata"
 requires-python = ">=3.10"
 dependencies = [
     "pillow>=11,<13",
+    "pydantic>=2.13.5,<3",
     "pymupdf>=1.25,<2",
 ]
 

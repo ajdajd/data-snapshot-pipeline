@@ -678,6 +678,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },
+    { name = "pydantic" },
     { name = "pymupdf" },
 ]
 
@@ -717,6 +718,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'yolo11'", specifier = ">=0.23,<2" },
     { name = "huggingface-hub", marker = "extra == 'yolo26'", specifier = ">=0.23,<2" },
     { name = "pillow", specifier = ">=11,<13" },
+    { name = "pydantic", specifier = ">=2.13.5,<3" },
     { name = "pymupdf", specifier = ">=1.25,<2" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=9,<10" },
     { name = "timm", marker = "extra == 'tfid'", specifier = ">=1,<2" },
