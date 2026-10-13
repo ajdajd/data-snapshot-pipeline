@@ -9,8 +9,8 @@ def create_adapter(model_name: str) -> LayoutAdapter:
     Parameters
     ----------
     model_name : str
-        Adapter identifier, currently ``"doclayoutyolo"``, ``"yolo11"``, or
-        ``"yolo26"``.
+        Adapter identifier, currently ``"doclayoutyolo"``, ``"tfid"``,
+        ``"yolo11"``, or ``"yolo26"``.
 
     Returns
     -------
@@ -28,6 +28,10 @@ def create_adapter(model_name: str) -> LayoutAdapter:
         )
 
         return DocLayoutYOLOAdapter()
+    if model_name == "tfid":
+        from data_snapshot_pipeline.adapters.tfid import TFIDAdapter
+
+        return TFIDAdapter()
     if model_name == "yolo11":
         from data_snapshot_pipeline.adapters.yolo11 import YOLO11Adapter
 

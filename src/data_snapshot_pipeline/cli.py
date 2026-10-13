@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--model",
         required=True,
-        help="One layout model: doclayoutyolo, yolo11, or yolo26.",
+        help="One layout model: doclayoutyolo, tfid, yolo11, or yolo26.",
     )
     parser.add_argument(
         "--input",

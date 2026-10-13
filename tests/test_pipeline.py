@@ -44,7 +44,7 @@ def test_run_extraction_selects_one_model_and_scopes_output(
     ]
 
 
-def test_create_adapter_rejects_unimplemented_model() -> None:
-    """Reject a model identifier until its adapter is implemented."""
-    with pytest.raises(ValueError, match="Unsupported model: tfid"):
-        create_adapter("tfid")
+def test_create_adapter_rejects_unknown_model() -> None:
+    """Reject an unknown model identifier."""
+    with pytest.raises(ValueError, match="Unsupported model: unknown"):
+        create_adapter("unknown")
