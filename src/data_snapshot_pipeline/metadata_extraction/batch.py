@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Iterable
 
+from tqdm.auto import tqdm
+
 from data_snapshot_pipeline.metadata_extraction.extraction import extract_metadata
 
 
@@ -35,9 +37,11 @@ def extract_metadata_files(
     """
     metadata_dir = Path(output_dir)
     output_paths: list[Path] = []
+    paths = [Path(path) for path in snapshot_paths]
 
-    for snapshot_path_value in snapshot_paths:
-        snapshot_path = Path(snapshot_path_value)
+    snapshot_progress = tqdm(paths, desc="Metadata", unit="snapshot")
+    for snapshot_path in snapshot_progress:
+        snapshot_progress.set_postfix_str(snapshot_path.name)
         metadata_path = metadata_dir / f"{snapshot_path.stem}.json"
         output_paths.append(metadata_path)
         if metadata_path.exists():

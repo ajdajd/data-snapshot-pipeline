@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+from tqdm.auto import tqdm
+
 from data_snapshot_pipeline.adapters import create_adapter
 from data_snapshot_pipeline.extraction import extract_snapshots, validate_unique_stems
 from data_snapshot_pipeline.inputs import discover_pdfs
@@ -52,11 +54,12 @@ def run_extraction(
         return []
 
     detector = create_adapter(normalized_name)
-    return [
-        snapshot_path
-        for pdf_path in pending_pdf_paths
-        for snapshot_path in extract_snapshots(pdf_path, model_dir, detector, dpi=dpi)
-    ]
+    output_paths: list[Path] = []
+    pdf_progress = tqdm(pending_pdf_paths, desc="PDFs", unit="pdf")
+    for pdf_path in pdf_progress:
+        pdf_progress.set_postfix_str(pdf_path.name)
+        output_paths.extend(extract_snapshots(pdf_path, model_dir, detector, dpi=dpi))
+    return output_paths
 
 
 def run_pipeline(

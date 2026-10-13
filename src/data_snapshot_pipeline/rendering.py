@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pymupdf
 from PIL import Image
+from tqdm.auto import tqdm
 
 
 def iter_pdf_pages(
@@ -40,6 +41,13 @@ def iter_pdf_pages(
         raise ValueError("DPI must be greater than zero.")
 
     with pymupdf.open(path) as document:
-        for page_index, page in enumerate(document):
+        pages = tqdm(
+            document,
+            total=document.page_count,
+            desc=f"Pages ({path.name})",
+            unit="page",
+            leave=False,
+        )
+        for page_index, page in enumerate(pages):
             pixmap = page.get_pixmap(dpi=dpi, alpha=False)
             yield page_index, pixmap.pil_image().convert("RGB")

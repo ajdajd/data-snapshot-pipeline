@@ -681,6 +681,7 @@ dependencies = [
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pymupdf" },
+    { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
@@ -729,6 +730,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=9,<10" },
     { name = "python-dotenv", marker = "extra == 'metadata'", specifier = ">=1,<2" },
     { name = "timm", marker = "extra == 'tfid'", specifier = ">=1,<2" },
+    { name = "tqdm", specifier = ">=4.67,<5" },
     { name = "transformers", marker = "extra == 'tfid'", specifier = "==4.46.0" },
     { name = "ultralytics", marker = "extra == 'yolo11'", specifier = ">=8.4,<9" },
     { name = "ultralytics", marker = "extra == 'yolo26'", specifier = ">=8.4,<9" },
