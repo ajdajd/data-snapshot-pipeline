@@ -65,8 +65,8 @@ Whether using the skill or working manually, an extractor integration must:
 
 1. Add `src/data_snapshot_pipeline/adapters/<model_name>.py` with typed,
    NumPy-documented configuration and implementation classes.
-2. Use medium model weights unless the project explicitly chooses another
-   size, and cache downloaded weights beneath `.cache/models/`.
+2. If multiple model sizes or variants exist, confirm the choice with the user
+   before implementation. Cache downloaded weights beneath `.cache/models/`.
 3. Convert model output to canonical `Detection` objects. Only `figure` and
    `table` labels are supported, and bounding boxes must be normalized to the
    inclusive unit interval.

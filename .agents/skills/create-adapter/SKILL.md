@@ -25,13 +25,13 @@ Use primary sources for the model and its inference library. Confirm:
 - confidence-score availability; and
 - license or remote-code requirements that affect use in this repository.
 
-State the proposed extractor name, checkpoint, dependencies, cache location, and
-user-run installation command. Ask only about unresolved choices that would
-materially change the integration.
+State the proposed extractor name, dependencies, cache location, and user-run
+installation command. If the model offers multiple sizes or variants and the
+user has not selected one, summarize the relevant quality, speed, memory, and
+licensing tradeoffs and ask which checkpoint to integrate.
 
-Prefer medium weights when the model offers size variants. Cache weights under
-the repository-local `.cache/models/` directory. Pin a revision whenever model
-loading executes repository-provided remote code.
+Cache weights under the repository-local `.cache/models/` directory. Pin a
+revision whenever model loading executes repository-provided remote code.
 
 Before installing dependencies or downloading weights, give the user the
 corresponding `uv` command to run in their terminal. Proceed with installation
@@ -84,7 +84,7 @@ specific to the integration:
 - score clamping or the documented fallback score;
 - invalid and undersized detection filtering;
 - configuration validation;
-- medium-weight filename and local cache defaults; and
+- selected checkpoint and local cache defaults; and
 - cached-weight loading without contacting the model hub, when practical.
 
 Never make model downloads or live API calls during tests. Format changed
