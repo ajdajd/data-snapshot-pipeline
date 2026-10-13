@@ -7,11 +7,17 @@ import pytest
 from data_snapshot_pipeline import cli
 
 
-def test_main_runs_extraction_with_defaults(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("extra_args", "expected_force"), [([], False), (["-f"], True)]
+)
+def test_main_runs_extraction_with_defaults_and_force(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    extra_args: list[str],
+    expected_force: bool,
 ) -> None:
     """Forward arguments and print paths returned by the pipeline."""
-    calls: list[tuple[Path, Path, str, int]] = []
+    calls: list[tuple[Path, Path, str, int, bool]] = []
 
     def fake_run_extraction(
         input_path: Path,
@@ -19,17 +25,26 @@ def test_main_runs_extraction_with_defaults(
         model_name: str,
         *,
         dpi: int,
+        force: bool,
     ) -> list[Path]:
         """Record the CLI values without running a model."""
-        calls.append((input_path, output_dir, model_name, dpi))
+        calls.append((input_path, output_dir, model_name, dpi, force))
         return [Path("output/yolo11/snapshots/example_table_000.png")]
 
     monkeypatch.setattr(cli, "run_extraction", fake_run_extraction)
 
-    result = cli.main(["--model=yolo11", "--input=data/example.pdf"])
+    result = cli.main(["--model=yolo11", "--input=data/example.pdf", *extra_args])
 
     assert result == 0
-    assert calls == [(Path("data/example.pdf"), Path("output"), "yolo11", 300)]
+    assert calls == [
+        (
+            Path("data/example.pdf"),
+            Path("output"),
+            "yolo11",
+            300,
+            expected_force,
+        )
+    ]
     assert capsys.readouterr().out == (
         "output/yolo11/snapshots/example_table_000.png\n"
     )

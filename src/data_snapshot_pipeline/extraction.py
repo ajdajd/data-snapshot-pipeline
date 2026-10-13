@@ -17,6 +17,7 @@ def extract_snapshots(
     adapter: LayoutAdapter,
     *,
     dpi: int = 300,
+    force: bool = False,
 ) -> list[Path]:
     """Detect and save figure and table snapshots from PDF inputs.
 
@@ -30,6 +31,8 @@ def extract_snapshots(
         Page-image detector producing canonical detections.
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
+    force : bool, optional
+        Delete existing snapshots for each source PDF before extracting it.
 
     Returns
     -------
@@ -39,7 +42,7 @@ def extract_snapshots(
     Raises
     ------
     FileExistsError
-        If a destination snapshot already exists.
+        If a destination snapshot appears while extraction is running.
     ValueError
         If multiple source PDFs have the same filename stem.
     """
@@ -50,6 +53,16 @@ def extract_snapshots(
     output_paths: list[Path] = []
 
     for pdf_path in pdf_paths:
+        existing_paths = _existing_snapshot_paths(snapshots_dir, pdf_path.stem)
+        if existing_paths and not force:
+            print(
+                f"Skipping {pdf_path}: existing snapshots found in "
+                f"{snapshots_dir} (use --force to replace)."
+            )
+            continue
+        for existing_path in existing_paths:
+            existing_path.unlink()
+
         counters = {"figure": 0, "table": 0}
         for _, page_image in iter_pdf_pages(pdf_path, dpi=dpi):
             detections = sorted(
@@ -73,6 +86,18 @@ def extract_snapshots(
                 output_paths.append(output_path)
 
     return output_paths
+
+
+def _existing_snapshot_paths(snapshots_dir: Path, pdf_stem: str) -> list[Path]:
+    """Return extraction outputs belonging to one source PDF stem."""
+    prefixes = (f"{pdf_stem}_figure_", f"{pdf_stem}_table_")
+    return sorted(
+        path
+        for path in snapshots_dir.iterdir()
+        if path.is_file()
+        and path.suffix.lower() == ".png"
+        and path.name.startswith(prefixes)
+    )
 
 
 def _validate_unique_stems(pdf_paths: list[Path]) -> None:

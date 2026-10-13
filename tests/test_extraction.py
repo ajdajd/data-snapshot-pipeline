@@ -49,18 +49,49 @@ def test_extract_snapshots_saves_spatially_ordered_zero_based_names(
     ]
 
 
-def test_extract_snapshots_refuses_to_overwrite(tmp_path: Path) -> None:
-    """Preserve an existing snapshot instead of replacing it."""
+def test_extract_snapshots_skips_existing_pdf(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Preserve existing snapshots and report a skipped source PDF."""
     pdf_path = tmp_path / "report.pdf"
     _write_pdf(pdf_path)
     existing = tmp_path / "output" / "snapshots" / "report_table_000.png"
     existing.parent.mkdir(parents=True)
     existing.write_bytes(b"keep")
 
-    with pytest.raises(FileExistsError, match="Snapshot already exists"):
-        extract_snapshots(pdf_path, tmp_path / "output", _FakeAdapter(), dpi=72)
+    paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeAdapter(), dpi=72)
 
+    assert paths == []
     assert existing.read_bytes() == b"keep"
+    assert f"Skipping {pdf_path}: existing snapshots found" in capsys.readouterr().out
+
+
+def test_extract_snapshots_force_replaces_existing_pdf(tmp_path: Path) -> None:
+    """Remove all prior crops for one PDF before extracting it again."""
+    pdf_path = tmp_path / "report.pdf"
+    _write_pdf(pdf_path)
+    snapshots_dir = tmp_path / "output" / "snapshots"
+    snapshots_dir.mkdir(parents=True)
+    existing = snapshots_dir / "report_table_000.png"
+    stale = snapshots_dir / "report_figure_999.png"
+    existing.write_bytes(b"old")
+    stale.write_bytes(b"stale")
+
+    paths = extract_snapshots(
+        pdf_path,
+        tmp_path / "output",
+        _FakeAdapter(),
+        dpi=72,
+        force=True,
+    )
+
+    assert [path.name for path in paths] == [
+        "report_table_000.png",
+        "report_figure_000.png",
+        "report_figure_001.png",
+    ]
+    assert existing.read_bytes() != b"old"
+    assert not stale.exists()
 
 
 def test_extract_snapshots_rejects_duplicate_document_stems(tmp_path: Path) -> None:

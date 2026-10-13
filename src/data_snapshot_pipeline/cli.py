@@ -60,6 +60,12 @@ def main(argv: list[str] | None = None) -> int:
         default=300,
         help="PDF rendering resolution (default: 300).",
     )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Replace existing snapshots for each input PDF.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -68,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output_dir,
             args.model,
             dpi=args.dpi,
+            force=args.force,
         )
     except (FileExistsError, FileNotFoundError, ValueError) as error:
         parser.error(str(error))

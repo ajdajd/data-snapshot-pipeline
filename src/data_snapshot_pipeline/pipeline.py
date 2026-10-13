@@ -12,6 +12,7 @@ def run_extraction(
     model_name: str,
     *,
     dpi: int = 300,
+    force: bool = False,
 ) -> list[Path]:
     """Extract snapshots beneath a directory named for the selected model.
 
@@ -25,6 +26,8 @@ def run_extraction(
         Identifier of the single model used for this run.
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
+    force : bool, optional
+        Delete existing snapshots for each source PDF before extracting it.
 
     Returns
     -------
@@ -43,4 +46,5 @@ def run_extraction(
         Path(output_dir) / normalized_name,
         adapter,
         dpi=dpi,
+        force=force,
     )
