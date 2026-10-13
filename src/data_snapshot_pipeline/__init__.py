@@ -2,7 +2,7 @@
 
 from data_snapshot_pipeline.detection import Detection, LayoutAdapter
 from data_snapshot_pipeline.extraction import extract_snapshots
-from data_snapshot_pipeline.inputs import discover_pdfs
+from data_snapshot_pipeline.inputs import discover_pdfs, discover_snapshot_images
 from data_snapshot_pipeline.metadata_extraction import (
     ExtractionResult,
     extract_metadata,
@@ -20,6 +20,7 @@ __all__ = [
     "LayoutAdapter",
     "build_snapshot_stem",
     "discover_pdfs",
+    "discover_snapshot_images",
     "extract_snapshots",
     "extract_metadata",
     "iter_pdf_pages",

@@ -8,6 +8,7 @@ import pytest
 from data_snapshot_pipeline import (
     build_snapshot_stem,
     discover_pdfs,
+    discover_snapshot_images,
     iter_pdf_pages,
 )
 
@@ -38,6 +39,34 @@ def test_discover_pdfs_rejects_invalid_inputs(tmp_path: Path) -> None:
         discover_pdfs(text_path)
     with pytest.raises(FileNotFoundError, match="No PDF files"):
         discover_pdfs(empty_dir)
+
+
+def test_discover_snapshot_images_accepts_file_or_directory(tmp_path: Path) -> None:
+    """Discover one image directly or supported images recursively in order."""
+    first_image = tmp_path / "a.png"
+    second_image = tmp_path / "nested" / "b.JPG"
+    second_image.parent.mkdir()
+    first_image.touch()
+    second_image.touch()
+    (tmp_path / "notes.txt").touch()
+
+    assert discover_snapshot_images(first_image) == [first_image]
+    assert discover_snapshot_images(tmp_path) == [first_image, second_image]
+
+
+def test_discover_snapshot_images_rejects_invalid_inputs(tmp_path: Path) -> None:
+    """Reject missing, unsupported, and empty-directory image inputs."""
+    text_path = tmp_path / "notes.txt"
+    text_path.touch()
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="Input does not exist"):
+        discover_snapshot_images(tmp_path / "missing")
+    with pytest.raises(ValueError, match="not a supported image"):
+        discover_snapshot_images(text_path)
+    with pytest.raises(FileNotFoundError, match="No snapshot images"):
+        discover_snapshot_images(empty_dir)
 
 
 def test_iter_pdf_pages_yields_rgb_pages(tmp_path: Path) -> None:

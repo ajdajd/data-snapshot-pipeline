@@ -76,7 +76,6 @@ def test_run_pipeline_skips_all_stages_for_existing_outputs(
         tmp_path / "output",
         "tfid",
         dpi=72,
-        with_metadata=True,
     )
 
     assert paths == []
@@ -86,7 +85,7 @@ def test_run_pipeline_skips_all_stages_for_existing_outputs(
     )
 
 
-def test_run_pipeline_force_cleans_exact_outputs_before_extraction(
+def test_run_extraction_force_cleans_exact_outputs_before_extraction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -107,7 +106,7 @@ def test_run_pipeline_force_cleans_exact_outputs_before_extraction(
     prefix_neighbor.write_bytes(b"keep")
     monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
 
-    paths = run_pipeline(
+    paths = run_extraction(
         pdf_path,
         tmp_path / "output",
         "tfid",
@@ -120,3 +119,32 @@ def test_run_pipeline_force_cleans_exact_outputs_before_extraction(
     assert len(paths) == 1
     assert paths[0] == snapshot_path
     assert "Cleaning up before continuing... Done!" in capsys.readouterr().out
+
+
+def test_run_pipeline_extracts_metadata_for_new_snapshots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pass newly extracted crops directly to metadata extraction."""
+    pdf_path = tmp_path / "report.pdf"
+    with pymupdf.open() as document:
+        document.new_page(width=72, height=72)
+        document.save(pdf_path)
+    model_dir = tmp_path / "output" / "tfid"
+    snapshot_path = model_dir / "snapshots" / "report_table_000.png"
+    metadata_path = model_dir / "metadata" / "report_table_000.json"
+    calls: list[tuple[list[Path], Path]] = []
+    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
+
+    def fake_extract_metadata_files(
+        snapshot_paths: list[Path], output_dir: Path
+    ) -> list[Path]:
+        """Record the crops passed to the metadata stage."""
+        calls.append((snapshot_paths, output_dir))
+        return [metadata_path]
+
+    monkeypatch.setattr(pipeline, "extract_metadata_files", fake_extract_metadata_files)
+
+    paths = run_pipeline(pdf_path, tmp_path / "output", "tfid", dpi=72)
+
+    assert calls == [([snapshot_path], model_dir / "metadata")]
+    assert paths == [snapshot_path, metadata_path]

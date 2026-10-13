@@ -1,10 +1,12 @@
-"""Provide the command-line interface for snapshot and metadata extraction."""
+"""Provide command-line interfaces for each pipeline stage."""
 
 import argparse
 import sys
 from pathlib import Path
 
-from data_snapshot_pipeline.pipeline import run_pipeline
+from data_snapshot_pipeline.inputs import discover_snapshot_images
+from data_snapshot_pipeline.metadata_extraction import extract_metadata_files
+from data_snapshot_pipeline.pipeline import run_extraction, run_pipeline
 
 
 def _positive_int(value: str) -> int:
@@ -16,7 +18,7 @@ def _positive_int(value: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run snapshot extraction from command-line arguments.
+    """Run the end-to-end pipeline from command-line arguments.
 
     Parameters
     ----------
@@ -27,17 +29,113 @@ def main(argv: list[str] | None = None) -> int:
     Returns
     -------
     int
-        Zero when extraction completes successfully.
+        Zero when the pipeline completes successfully, otherwise one.
 
     Raises
     ------
     SystemExit
-        If arguments are invalid or extraction cannot start safely.
+        If arguments or local inputs are invalid.
+    """
+    parser = _layout_parser(
+        "python -m data_snapshot_pipeline",
+        "Extract data snapshots and Schema v1.4 metadata from PDFs.",
+    )
+    return _run_layout_command(parser, argv, end_to_end=True)
+
+
+def snapshot_main(argv: list[str] | None = None) -> int:
+    """Run data snapshot extraction from command-line arguments.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Arguments to parse, excluding the executable name. Uses ``sys.argv``
+        when omitted.
+
+    Returns
+    -------
+    int
+        Zero when extraction completes successfully, otherwise one.
+
+    Raises
+    ------
+    SystemExit
+        If arguments or local inputs are invalid.
+    """
+    parser = _layout_parser(
+        "python -m data_snapshot_pipeline.extract_data_snapshot",
+        "Extract data snapshots from PDFs without metadata extraction.",
+    )
+    return _run_layout_command(parser, argv, end_to_end=False)
+
+
+def metadata_main(argv: list[str] | None = None) -> int:
+    """Run metadata extraction from command-line arguments.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Arguments to parse, excluding the executable name. Uses ``sys.argv``
+        when omitted.
+
+    Returns
+    -------
+    int
+        Zero when extraction completes successfully, otherwise one.
+
+    Raises
+    ------
+    SystemExit
+        If arguments or local inputs are invalid.
     """
     parser = argparse.ArgumentParser(
-        prog="python -m data_snapshot_pipeline",
-        description="Extract snapshots and optional metadata from PDFs.",
+        prog="python -m data_snapshot_pipeline.extract_metadata",
+        description="Extract Schema v1.4 metadata from snapshot images.",
     )
+    parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="A snapshot image or directory containing snapshot images.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help=(
+            "Metadata output directory. By default, infer the metadata sibling "
+            "of an input snapshots directory."
+        ),
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Replace existing metadata without modifying snapshots.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        snapshot_paths = discover_snapshot_images(args.input)
+        output_dir = args.output_dir or _infer_metadata_output_dir(args.input)
+        paths = extract_metadata_files(
+            snapshot_paths,
+            output_dir,
+            force=args.force,
+        )
+    except (FileNotFoundError, ValueError) as error:
+        parser.error(str(error))
+    except RuntimeError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+
+    for path in paths:
+        print(path)
+    return 0
+
+
+def _layout_parser(prog: str, description: str) -> argparse.ArgumentParser:
+    """Build the shared PDF extraction argument parser."""
+    parser = argparse.ArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "--model",
         required=True,
@@ -65,23 +163,27 @@ def main(argv: list[str] | None = None) -> int:
         "-f",
         "--force",
         action="store_true",
-        help="Replace existing outputs for each input PDF.",
+        help="Delete matching crops and metadata before extraction.",
     )
-    parser.add_argument(
-        "--with-metadata",
-        action="store_true",
-        help="Extract Schema v1.4 metadata for each snapshot.",
-    )
-    args = parser.parse_args(argv)
+    return parser
 
+
+def _run_layout_command(
+    parser: argparse.ArgumentParser,
+    argv: list[str] | None,
+    *,
+    end_to_end: bool,
+) -> int:
+    """Run one PDF command and print its output paths."""
+    args = parser.parse_args(argv)
+    operation = run_pipeline if end_to_end else run_extraction
     try:
-        paths = run_pipeline(
+        paths = operation(
             args.input,
             args.output_dir,
             args.model,
             dpi=args.dpi,
             force=args.force,
-            with_metadata=args.with_metadata,
         )
     except (FileExistsError, FileNotFoundError, ValueError) as error:
         parser.error(str(error))
@@ -92,3 +194,13 @@ def main(argv: list[str] | None = None) -> int:
     for path in paths:
         print(path)
     return 0
+
+
+def _infer_metadata_output_dir(input_path: Path) -> Path:
+    """Infer a sibling metadata directory from a snapshots input path."""
+    snapshots_dir = input_path if input_path.is_dir() else input_path.parent
+    if snapshots_dir.name != "snapshots":
+        raise ValueError(
+            "--output-dir is required unless the input is in a snapshots directory."
+        )
+    return snapshots_dir.parent / "metadata"

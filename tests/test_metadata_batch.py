@@ -64,37 +64,36 @@ def test_extract_metadata_files_skips_existing_output(
 
     assert paths == [metadata_path]
     assert metadata_path.read_text(encoding="utf-8") == '{"keep": true}\n'
-    assert "existing metadata found" in capsys.readouterr().out
+    assert capsys.readouterr().out == (
+        "Existing metadata output for report_table_000.png exists. "
+        "Skipped metadata extraction.\n"
+    )
 
 
-def test_force_replaces_current_and_removes_stale_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_force_replaces_metadata_without_modifying_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Replace current JSON and remove stale outputs for the same source PDF."""
+    """Replace current JSON while preserving the source snapshot."""
     snapshot_path = tmp_path / "snapshots" / "report_table_000.png"
     metadata_dir = tmp_path / "metadata"
     metadata_path = metadata_dir / "report_table_000.json"
-    stale_path = metadata_dir / "report_figure_999.json"
-    unrelated_path = metadata_dir / "other_table_000.json"
-    prefix_neighbor = metadata_dir / "report_figure_2024_table_000.json"
     snapshot_path.parent.mkdir()
     metadata_dir.mkdir()
     snapshot_path.write_bytes(b"image")
-    for path in (metadata_path, stale_path, unrelated_path, prefix_neighbor):
-        path.write_text('{"old": true}\n', encoding="utf-8")
+    metadata_path.write_text('{"old": true}\n', encoding="utf-8")
     monkeypatch.setattr(batch, "extract_metadata", lambda path: _result("New title"))
 
     batch.extract_metadata_files(
         [snapshot_path],
         metadata_dir,
         force=True,
-        source_stems=["report"],
     )
 
     assert json.loads(metadata_path.read_text(encoding="utf-8"))["title"] == "New title"
-    assert not stale_path.exists()
-    assert unrelated_path.exists()
-    assert prefix_neighbor.exists()
+    assert snapshot_path.read_bytes() == b"image"
+    assert "Cleaning up before continuing... Done!" in capsys.readouterr().out
 
 
 def test_extraction_failure_writes_nothing(

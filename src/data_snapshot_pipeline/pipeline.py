@@ -30,7 +30,8 @@ def run_extraction(
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
     force : bool, optional
-        Delete existing snapshots for each source PDF before extracting it.
+        Delete existing snapshots and metadata for each source PDF before
+        extracting it.
 
     Returns
     -------
@@ -43,14 +44,19 @@ def run_extraction(
         If the model identifier is not implemented.
     """
     normalized_name = model_name.strip().lower()
+    pdf_paths = discover_pdfs(input_path)
+    validate_unique_stems(pdf_paths)
+    model_dir = Path(output_dir) / normalized_name
+    pending_pdf_paths = _prepare_pdf_paths(pdf_paths, model_dir, force=force)
+    if not pending_pdf_paths:
+        return []
+
     adapter = create_adapter(normalized_name)
-    return extract_snapshots(
-        input_path,
-        Path(output_dir) / normalized_name,
-        adapter,
-        dpi=dpi,
-        force=force,
-    )
+    return [
+        snapshot_path
+        for pdf_path in pending_pdf_paths
+        for snapshot_path in extract_snapshots(pdf_path, model_dir, adapter, dpi=dpi)
+    ]
 
 
 def run_pipeline(
@@ -60,9 +66,8 @@ def run_pipeline(
     *,
     dpi: int = 300,
     force: bool = False,
-    with_metadata: bool = False,
 ) -> list[Path]:
-    """Run layout extraction and optionally extract semantic metadata.
+    """Run layout extraction followed by semantic metadata extraction.
 
     Parameters
     ----------
@@ -76,13 +81,11 @@ def run_pipeline(
         PyMuPDF rendering resolution in dots per inch.
     force : bool, optional
         Replace outputs belonging to each source PDF.
-    with_metadata : bool, optional
-        Extract Schema v1.4 metadata for the available snapshots.
 
     Returns
     -------
     list[Path]
-        Available snapshot paths followed by metadata paths, when requested.
+        Snapshot paths followed by metadata paths.
 
     Raises
     ------
@@ -92,11 +95,25 @@ def run_pipeline(
         If the model identifier or input PDF set is invalid.
     """
     normalized_name = model_name.strip().lower()
-    pdf_paths = discover_pdfs(input_path)
-    validate_unique_stems(pdf_paths)
-    model_dir = Path(output_dir) / normalized_name
-    pending_pdf_paths: list[Path] = []
+    snapshot_paths = run_extraction(
+        input_path,
+        output_dir,
+        normalized_name,
+        dpi=dpi,
+        force=force,
+    )
+    metadata_paths = extract_metadata_files(
+        snapshot_paths,
+        Path(output_dir) / normalized_name / "metadata",
+    )
+    return [*snapshot_paths, *metadata_paths]
 
+
+def _prepare_pdf_paths(
+    pdf_paths: list[Path], model_dir: Path, *, force: bool
+) -> list[Path]:
+    """Skip or clean existing outputs and return PDFs ready to process."""
+    pending_pdf_paths: list[Path] = []
     for pdf_path in pdf_paths:
         existing_paths = _existing_output_paths(model_dir, pdf_path.stem)
         if not existing_paths:
@@ -118,24 +135,7 @@ def run_pipeline(
             existing_path.unlink()
         print("Done!")
         pending_pdf_paths.append(pdf_path)
-
-    if not pending_pdf_paths:
-        return []
-
-    adapter = create_adapter(normalized_name)
-    snapshot_paths = [
-        snapshot_path
-        for pdf_path in pending_pdf_paths
-        for snapshot_path in extract_snapshots(pdf_path, model_dir, adapter, dpi=dpi)
-    ]
-    if not with_metadata:
-        return snapshot_paths
-
-    metadata_paths = extract_metadata_files(
-        snapshot_paths,
-        model_dir / "metadata",
-    )
-    return [*snapshot_paths, *metadata_paths]
+    return pending_pdf_paths
 
 
 def _existing_output_paths(model_dir: Path, pdf_stem: str) -> list[Path]:

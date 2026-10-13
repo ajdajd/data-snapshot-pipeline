@@ -1,4 +1,4 @@
-"""Test the snapshot extraction command-line interface."""
+"""Test the pipeline command-line interfaces."""
 
 from pathlib import Path
 
@@ -17,7 +17,7 @@ def test_main_runs_pipeline_with_defaults_and_force(
     expected_force: bool,
 ) -> None:
     """Forward arguments and print paths returned by the pipeline."""
-    calls: list[tuple[Path, Path, str, int, bool, bool]] = []
+    calls: list[tuple[Path, Path, str, int, bool]] = []
 
     def fake_run_pipeline(
         input_path: Path,
@@ -26,10 +26,9 @@ def test_main_runs_pipeline_with_defaults_and_force(
         *,
         dpi: int,
         force: bool,
-        with_metadata: bool,
     ) -> list[Path]:
         """Record the CLI values without running a model."""
-        calls.append((input_path, output_dir, model_name, dpi, force, with_metadata))
+        calls.append((input_path, output_dir, model_name, dpi, force))
         return [Path("output/yolo11/snapshots/example_table_000.png")]
 
     monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
@@ -44,7 +43,6 @@ def test_main_runs_pipeline_with_defaults_and_force(
             "yolo11",
             300,
             expected_force,
-            False,
         )
     ]
     assert capsys.readouterr().out == (
@@ -52,27 +50,67 @@ def test_main_runs_pipeline_with_defaults_and_force(
     )
 
 
-def test_main_requests_metadata(
+def test_snapshot_main_runs_only_snapshot_extraction(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Forward the metadata flag and print both output paths."""
-    calls: list[bool] = []
+    """Use the snapshot-only operation and print its output paths."""
+    calls: list[str] = []
 
-    def fake_run_pipeline(*args: object, **kwargs: object) -> list[Path]:
-        """Record whether metadata extraction was requested."""
-        calls.append(bool(kwargs["with_metadata"]))
-        return [
-            Path("output/tfid/snapshots/example_table_000.png"),
-            Path("output/tfid/metadata/example_table_000.json"),
-        ]
+    def fake_run_extraction(*args: object, **kwargs: object) -> list[Path]:
+        """Record that snapshot extraction was selected."""
+        calls.append(str(args[2]))
+        return [Path("output/tfid/snapshots/example_table_000.png")]
 
-    monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
+    monkeypatch.setattr(cli, "run_extraction", fake_run_extraction)
 
-    result = cli.main(["--model=tfid", "--input=data/example.pdf", "--with-metadata"])
+    result = cli.snapshot_main(["--model=tfid", "--input=data/example.pdf"])
 
     assert result == 0
-    assert calls == [True]
-    assert capsys.readouterr().out.endswith("example_table_000.json\n")
+    assert calls == ["tfid"]
+    assert capsys.readouterr().out.endswith("example_table_000.png\n")
+
+
+def test_metadata_main_infers_output_and_forwards_force(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Infer the metadata sibling and run only metadata extraction."""
+    snapshot_path = tmp_path / "tfid" / "snapshots" / "report_table_000.png"
+    snapshot_path.parent.mkdir(parents=True)
+    snapshot_path.write_bytes(b"image")
+    calls: list[tuple[list[Path], Path, bool]] = []
+
+    def fake_extract_metadata_files(
+        snapshot_paths: list[Path], output_dir: Path, *, force: bool
+    ) -> list[Path]:
+        """Record metadata command values without making an API request."""
+        paths = list(snapshot_paths)
+        calls.append((paths, output_dir, force))
+        return [output_dir / "report_table_000.json"]
+
+    monkeypatch.setattr(cli, "extract_metadata_files", fake_extract_metadata_files)
+
+    result = cli.metadata_main([f"--input={snapshot_path}", "--force"])
+
+    metadata_dir = tmp_path / "tfid" / "metadata"
+    assert result == 0
+    assert calls == [([snapshot_path], metadata_dir, True)]
+    assert capsys.readouterr().out == f"{metadata_dir / 'report_table_000.json'}\n"
+
+
+def test_metadata_main_requires_output_for_arbitrary_image(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Require an explicit output directory outside a snapshots directory."""
+    snapshot_path = tmp_path / "report.png"
+    snapshot_path.write_bytes(b"image")
+
+    with pytest.raises(SystemExit) as error:
+        cli.metadata_main([f"--input={snapshot_path}"])
+
+    assert error.value.code == 2
+    assert "--output-dir is required" in capsys.readouterr().err
 
 
 def test_main_reports_pipeline_input_error(
