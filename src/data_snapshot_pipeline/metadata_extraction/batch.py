@@ -1,5 +1,6 @@
 """Write validated metadata JSON for extracted snapshot images."""
 
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -81,17 +82,14 @@ def _existing_metadata_paths(
     metadata_dir: Path, source_stems: Iterable[str]
 ) -> set[Path]:
     """Return metadata outputs belonging to selected PDF stems."""
-    prefixes = tuple(
-        prefix
+    patterns = tuple(
+        re.compile(rf"{re.escape(source_stem)}_(?:figure|table)_\d{{3,}}\.json")
         for source_stem in source_stems
-        for prefix in (f"{source_stem}_figure_", f"{source_stem}_table_")
     )
-    if not prefixes:
+    if not patterns:
         return set()
     return {
         path
         for path in metadata_dir.iterdir()
-        if path.is_file()
-        and path.suffix.lower() == ".json"
-        and path.name.startswith(prefixes)
+        if path.is_file() and any(pattern.fullmatch(path.name) for pattern in patterns)
     }

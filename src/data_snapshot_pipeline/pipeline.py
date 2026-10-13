@@ -1,9 +1,10 @@
 """Run snapshot extraction with one explicitly selected model."""
 
+import re
 from pathlib import Path
 
 from data_snapshot_pipeline.adapters import create_adapter
-from data_snapshot_pipeline.extraction import extract_snapshots
+from data_snapshot_pipeline.extraction import extract_snapshots, validate_unique_stems
 from data_snapshot_pipeline.inputs import discover_pdfs
 from data_snapshot_pipeline.metadata_extraction import extract_metadata_files
 
@@ -91,21 +92,66 @@ def run_pipeline(
         If the model identifier or input PDF set is invalid.
     """
     normalized_name = model_name.strip().lower()
-    snapshot_paths = run_extraction(
-        input_path,
-        output_dir,
-        normalized_name,
-        dpi=dpi,
-        force=force,
-    )
+    pdf_paths = discover_pdfs(input_path)
+    validate_unique_stems(pdf_paths)
+    model_dir = Path(output_dir) / normalized_name
+    pending_pdf_paths: list[Path] = []
+
+    for pdf_path in pdf_paths:
+        existing_paths = _existing_output_paths(model_dir, pdf_path.stem)
+        if not existing_paths:
+            pending_pdf_paths.append(pdf_path)
+            continue
+        if not force:
+            print(
+                f"Existing output files for {pdf_path.name} exist. "
+                "Skipped data snapshot and metadata extraction."
+            )
+            continue
+        print(
+            f"Existing output files for {pdf_path.name} exist. "
+            "Cleaning up before continuing...",
+            end=" ",
+            flush=True,
+        )
+        for existing_path in existing_paths:
+            existing_path.unlink()
+        print("Done!")
+        pending_pdf_paths.append(pdf_path)
+
+    if not pending_pdf_paths:
+        return []
+
+    adapter = create_adapter(normalized_name)
+    snapshot_paths = [
+        snapshot_path
+        for pdf_path in pending_pdf_paths
+        for snapshot_path in extract_snapshots(pdf_path, model_dir, adapter, dpi=dpi)
+    ]
     if not with_metadata:
         return snapshot_paths
 
-    source_stems = [path.stem for path in discover_pdfs(input_path)]
     metadata_paths = extract_metadata_files(
         snapshot_paths,
-        Path(output_dir) / normalized_name / "metadata",
-        force=force,
-        source_stems=source_stems,
+        model_dir / "metadata",
     )
     return [*snapshot_paths, *metadata_paths]
+
+
+def _existing_output_paths(model_dir: Path, pdf_stem: str) -> list[Path]:
+    """Return exact crop and metadata outputs for one PDF stem."""
+    pattern = re.compile(rf"{re.escape(pdf_stem)}_(?:figure|table)_\d{{3,}}")
+    output_paths: list[Path] = []
+    for directory, suffix in (
+        (model_dir / "snapshots", ".png"),
+        (model_dir / "metadata", ".json"),
+    ):
+        if directory.is_dir():
+            output_paths.extend(
+                path
+                for path in directory.iterdir()
+                if path.is_file()
+                and path.suffix.lower() == suffix
+                and pattern.fullmatch(path.stem)
+            )
+    return sorted(output_paths)

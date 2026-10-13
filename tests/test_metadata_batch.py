@@ -76,10 +76,11 @@ def test_force_replaces_current_and_removes_stale_metadata(
     metadata_path = metadata_dir / "report_table_000.json"
     stale_path = metadata_dir / "report_figure_999.json"
     unrelated_path = metadata_dir / "other_table_000.json"
+    prefix_neighbor = metadata_dir / "report_figure_2024_table_000.json"
     snapshot_path.parent.mkdir()
     metadata_dir.mkdir()
     snapshot_path.write_bytes(b"image")
-    for path in (metadata_path, stale_path, unrelated_path):
+    for path in (metadata_path, stale_path, unrelated_path, prefix_neighbor):
         path.write_text('{"old": true}\n', encoding="utf-8")
     monkeypatch.setattr(batch, "extract_metadata", lambda path: _result("New title"))
 
@@ -93,6 +94,7 @@ def test_force_replaces_current_and_removes_stale_metadata(
     assert json.loads(metadata_path.read_text(encoding="utf-8"))["title"] == "New title"
     assert not stale_path.exists()
     assert unrelated_path.exists()
+    assert prefix_neighbor.exists()
 
 
 def test_extraction_failure_writes_nothing(

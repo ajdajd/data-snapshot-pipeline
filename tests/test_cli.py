@@ -93,6 +93,23 @@ def test_main_reports_pipeline_input_error(
     assert "Unsupported model: unknown" in capsys.readouterr().err
 
 
+def test_main_reports_runtime_error_without_usage(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Report a valid command's runtime failure without argparse help."""
+
+    def reject_request(*args: object, **kwargs: object) -> list[Path]:
+        """Raise a metadata runtime error."""
+        raise RuntimeError("OpenAI credits are exhausted.")
+
+    monkeypatch.setattr(cli, "run_pipeline", reject_request)
+
+    result = cli.main(["--model=tfid", "--input=data/example.pdf"])
+
+    assert result == 1
+    assert capsys.readouterr().err == "error: OpenAI credits are exhausted.\n"
+
+
 def test_main_rejects_nonpositive_dpi() -> None:
     """Reject a rendering resolution that cannot produce an image."""
     with pytest.raises(SystemExit) as error:

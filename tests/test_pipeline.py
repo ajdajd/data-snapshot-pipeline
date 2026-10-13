@@ -50,10 +50,12 @@ def test_create_adapter_rejects_unknown_model() -> None:
         create_adapter("unknown")
 
 
-def test_run_pipeline_extracts_metadata_for_available_snapshots(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_run_pipeline_skips_all_stages_for_existing_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Pass existing snapshots to model-scoped metadata extraction."""
+    """Skip both stages when an exact output already exists."""
     pdf_path = tmp_path / "report.pdf"
     with pymupdf.open() as document:
         document.new_page(width=72, height=72)
@@ -61,22 +63,13 @@ def test_run_pipeline_extracts_metadata_for_available_snapshots(
     snapshot_path = tmp_path / "output" / "tfid" / "snapshots" / "report_table_000.png"
     snapshot_path.parent.mkdir(parents=True)
     snapshot_path.write_bytes(b"existing")
-    calls: list[tuple[list[Path], Path, bool, list[str]]] = []
-
-    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
-
-    def fake_extract_metadata_files(
-        snapshot_paths: list[Path],
-        output_dir: Path,
-        *,
-        force: bool,
-        source_stems: list[str],
-    ) -> list[Path]:
-        """Record metadata orchestration without calling the API."""
-        calls.append((snapshot_paths, output_dir, force, source_stems))
-        return [output_dir / "report_table_000.json"]
-
-    monkeypatch.setattr(pipeline, "extract_metadata_files", fake_extract_metadata_files)
+    monkeypatch.setattr(
+        pipeline,
+        "create_adapter",
+        lambda model_name: (_ for _ in ()).throw(
+            AssertionError("Skipped extraction loaded the layout model.")
+        ),
+    )
 
     paths = run_pipeline(
         pdf_path,
@@ -86,6 +79,44 @@ def test_run_pipeline_extracts_metadata_for_available_snapshots(
         with_metadata=True,
     )
 
-    metadata_dir = tmp_path / "output" / "tfid" / "metadata"
-    assert paths == [snapshot_path, metadata_dir / "report_table_000.json"]
-    assert calls == [([snapshot_path], metadata_dir, False, ["report"])]
+    assert paths == []
+    assert capsys.readouterr().out == (
+        "Existing output files for report.pdf exist. "
+        "Skipped data snapshot and metadata extraction.\n"
+    )
+
+
+def test_run_pipeline_force_cleans_exact_outputs_before_extraction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Remove crops and metadata for only the forced PDF stem."""
+    pdf_path = tmp_path / "report.pdf"
+    with pymupdf.open() as document:
+        document.new_page(width=72, height=72)
+        document.save(pdf_path)
+    model_dir = tmp_path / "output" / "tfid"
+    snapshot_path = model_dir / "snapshots" / "report_table_000.png"
+    metadata_path = model_dir / "metadata" / "report_table_000.json"
+    prefix_neighbor = model_dir / "snapshots" / "report_figure_2024_table_000.png"
+    snapshot_path.parent.mkdir(parents=True)
+    metadata_path.parent.mkdir(parents=True)
+    snapshot_path.write_bytes(b"old")
+    metadata_path.write_text("{}\n", encoding="utf-8")
+    prefix_neighbor.write_bytes(b"keep")
+    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
+
+    paths = run_pipeline(
+        pdf_path,
+        tmp_path / "output",
+        "tfid",
+        dpi=72,
+        force=True,
+    )
+
+    assert metadata_path.exists() is False
+    assert prefix_neighbor.read_bytes() == b"keep"
+    assert len(paths) == 1
+    assert paths[0] == snapshot_path
+    assert "Cleaning up before continuing... Done!" in capsys.readouterr().out

@@ -1,6 +1,7 @@
 """Provide the command-line interface for snapshot and metadata extraction."""
 
 import argparse
+import sys
 from pathlib import Path
 
 from data_snapshot_pipeline.pipeline import run_pipeline
@@ -82,8 +83,11 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
             with_metadata=args.with_metadata,
         )
-    except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as error:
+    except (FileExistsError, FileNotFoundError, ValueError) as error:
         parser.error(str(error))
+    except RuntimeError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
 
     for path in paths:
         print(path)

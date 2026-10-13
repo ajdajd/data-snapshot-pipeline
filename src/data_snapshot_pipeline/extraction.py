@@ -1,5 +1,6 @@
 """Extract data snapshot images from PDF files."""
 
+import re
 from math import ceil, floor
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def extract_snapshots(
         If multiple source PDFs have the same filename stem.
     """
     pdf_paths = discover_pdfs(input_path)
-    _validate_unique_stems(pdf_paths)
+    validate_unique_stems(pdf_paths)
     snapshots_dir = Path(output_dir) / "snapshots"
     snapshots_dir.mkdir(parents=True, exist_ok=True)
     output_paths: list[Path] = []
@@ -91,17 +92,15 @@ def extract_snapshots(
 
 def _existing_snapshot_paths(snapshots_dir: Path, pdf_stem: str) -> list[Path]:
     """Return extraction outputs belonging to one source PDF stem."""
-    prefixes = (f"{pdf_stem}_figure_", f"{pdf_stem}_table_")
+    pattern = re.compile(rf"{re.escape(pdf_stem)}_(?:figure|table)_\d{{3,}}\.png")
     return sorted(
         path
         for path in snapshots_dir.iterdir()
-        if path.is_file()
-        and path.suffix.lower() == ".png"
-        and path.name.startswith(prefixes)
+        if path.is_file() and pattern.fullmatch(path.name)
     )
 
 
-def _validate_unique_stems(pdf_paths: list[Path]) -> None:
+def validate_unique_stems(pdf_paths: list[Path]) -> None:
     """Reject source documents that would share output filenames."""
     stems = [path.stem for path in pdf_paths]
     duplicates = sorted({stem for stem in stems if stems.count(stem) > 1})
