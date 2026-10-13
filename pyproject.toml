@@ -25,6 +25,10 @@ yolo11 = [
     "huggingface-hub>=0.23,<2",
     "ultralytics>=8.4,<9",
 ]
+doclayoutyolo = [
+    "doclayout-yolo==0.0.4",
+    "huggingface-hub>=0.23,<2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
