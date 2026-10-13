@@ -1,6 +1,6 @@
 """Expose the production data snapshot pipeline API."""
 
-from data_snapshot_pipeline.detection import Detection, LayoutAdapter
+from data_snapshot_pipeline.detection import Detection, SnapshotDetector
 from data_snapshot_pipeline.extraction import extract_snapshots
 from data_snapshot_pipeline.inputs import discover_pdfs, discover_snapshot_images
 from data_snapshot_pipeline.metadata_extraction import (
@@ -17,7 +17,7 @@ __all__ = [
     "Detection",
     "DataSnapshotMetadata",
     "ExtractionResult",
-    "LayoutAdapter",
+    "SnapshotDetector",
     "build_snapshot_stem",
     "discover_pdfs",
     "discover_snapshot_images",

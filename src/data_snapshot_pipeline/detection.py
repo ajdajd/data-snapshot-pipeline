@@ -1,4 +1,4 @@
-"""Define canonical layout detections produced by model adapters."""
+"""Define canonical data snapshot detections and detector protocol."""
 
 from dataclasses import dataclass
 from typing import Literal, Protocol
@@ -42,8 +42,8 @@ class Detection:
             raise ValueError("Detection score must be between zero and one.")
 
 
-class LayoutAdapter(Protocol):
-    """Define the page-image interface implemented by layout adapters."""
+class SnapshotDetector(Protocol):
+    """Define the page-image interface implemented by snapshot detectors."""
 
     def detect(self, image: Image.Image) -> list[Detection]:
         """Return canonical detections for one rendered PDF page.

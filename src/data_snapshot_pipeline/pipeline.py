@@ -26,7 +26,7 @@ def run_extraction(
     output_dir : str | Path
         Root output directory.
     model_name : str
-        Identifier of the single model used for this run.
+        Identifier of the single snapshot extractor used for this run.
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
     force : bool, optional
@@ -51,11 +51,11 @@ def run_extraction(
     if not pending_pdf_paths:
         return []
 
-    adapter = create_adapter(normalized_name)
+    detector = create_adapter(normalized_name)
     return [
         snapshot_path
         for pdf_path in pending_pdf_paths
-        for snapshot_path in extract_snapshots(pdf_path, model_dir, adapter, dpi=dpi)
+        for snapshot_path in extract_snapshots(pdf_path, model_dir, detector, dpi=dpi)
     ]
 
 
@@ -67,7 +67,7 @@ def run_pipeline(
     dpi: int = 300,
     force: bool = False,
 ) -> list[Path]:
-    """Run layout extraction followed by semantic metadata extraction.
+    """Run snapshot extraction followed by semantic metadata extraction.
 
     Parameters
     ----------
@@ -76,7 +76,7 @@ def run_pipeline(
     output_dir : str | Path
         Root output directory.
     model_name : str
-        Identifier of the single layout model used for this run.
+        Identifier of the single snapshot extractor used for this run.
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
     force : bool, optional

@@ -9,7 +9,7 @@ from PIL import Image
 from data_snapshot_pipeline import Detection, extract_snapshots
 
 
-class _FakeAdapter:
+class _FakeDetector:
     """Return fixed detections for extraction tests."""
 
     def detect(self, image: Image.Image) -> list[Detection]:
@@ -35,7 +35,7 @@ def test_extract_snapshots_saves_spatially_ordered_zero_based_names(
     pdf_path = tmp_path / "report.pdf"
     _write_pdf(pdf_path)
 
-    paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeAdapter(), dpi=72)
+    paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeDetector(), dpi=72)
 
     assert [path.name for path in paths] == [
         "report_table_000.png",
@@ -59,7 +59,7 @@ def test_extract_snapshots_skips_existing_pdf(
     existing.parent.mkdir(parents=True)
     existing.write_bytes(b"keep")
 
-    paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeAdapter(), dpi=72)
+    paths = extract_snapshots(pdf_path, tmp_path / "output", _FakeDetector(), dpi=72)
 
     assert paths == [existing]
     assert existing.read_bytes() == b"keep"
@@ -80,7 +80,7 @@ def test_extract_snapshots_force_replaces_existing_pdf(tmp_path: Path) -> None:
     paths = extract_snapshots(
         pdf_path,
         tmp_path / "output",
-        _FakeAdapter(),
+        _FakeDetector(),
         dpi=72,
         force=True,
     )
@@ -104,4 +104,4 @@ def test_extract_snapshots_rejects_duplicate_document_stems(tmp_path: Path) -> N
     _write_pdf(second_dir / "report.pdf")
 
     with pytest.raises(ValueError, match="filename stems must be unique"):
-        extract_snapshots(tmp_path, tmp_path / "output", _FakeAdapter(), dpi=72)
+        extract_snapshots(tmp_path, tmp_path / "output", _FakeDetector(), dpi=72)

@@ -39,7 +39,7 @@ yourself only when the user asks you to.
 
 ## Implement the extractor
 
-The extractor must satisfy the internal `LayoutAdapter` protocol from
+The extractor must satisfy the internal `SnapshotDetector` protocol from
 `src/data_snapshot_pipeline/detection.py`:
 
 ```python

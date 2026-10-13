@@ -11,7 +11,7 @@ from data_snapshot_pipeline import pipeline
 from data_snapshot_pipeline.adapters import create_adapter
 
 
-class _FakeAdapter:
+class _FakeDetector:
     """Return one table detection for pipeline tests."""
 
     def detect(self, image: Image.Image) -> list[Detection]:
@@ -29,10 +29,10 @@ def test_run_extraction_selects_one_model_and_scopes_output(
         document.save(pdf_path)
     selected_models: list[str] = []
 
-    def fake_create_adapter(model_name: str) -> _FakeAdapter:
-        """Record and return the selected test adapter."""
+    def fake_create_adapter(model_name: str) -> _FakeDetector:
+        """Record and return the selected test detector."""
         selected_models.append(model_name)
-        return _FakeAdapter()
+        return _FakeDetector()
 
     monkeypatch.setattr(pipeline, "create_adapter", fake_create_adapter)
 
@@ -67,7 +67,7 @@ def test_run_pipeline_skips_all_stages_for_existing_outputs(
         pipeline,
         "create_adapter",
         lambda model_name: (_ for _ in ()).throw(
-            AssertionError("Skipped extraction loaded the layout model.")
+            AssertionError("Skipped extraction loaded the snapshot detector.")
         ),
     )
 
@@ -104,7 +104,7 @@ def test_run_extraction_force_cleans_exact_outputs_before_extraction(
     snapshot_path.write_bytes(b"old")
     metadata_path.write_text("{}\n", encoding="utf-8")
     prefix_neighbor.write_bytes(b"keep")
-    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
+    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeDetector())
 
     paths = run_extraction(
         pdf_path,
@@ -133,7 +133,7 @@ def test_run_pipeline_extracts_metadata_for_new_snapshots(
     snapshot_path = model_dir / "snapshots" / "report_table_000.png"
     metadata_path = model_dir / "metadata" / "report_table_000.json"
     calls: list[tuple[list[Path], Path]] = []
-    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeAdapter())
+    monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeDetector())
 
     def fake_extract_metadata_files(
         snapshot_paths: list[Path], output_dir: Path

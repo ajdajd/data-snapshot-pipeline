@@ -79,7 +79,7 @@ Whether using the skill or working manually, an extractor integration must:
 7. Add the extractor identifier, dependency extra, weights, and inference size
    to the table in `README.md`.
 
-`LayoutAdapter` is the internal Python protocol for snapshot extractors. Do not
+`SnapshotDetector` is the internal Python protocol for snapshot extractors. Do not
 add a new CLI entry point for each extractor; the existing PDF commands select
 exactly one through `--model=<model_name>`.
 

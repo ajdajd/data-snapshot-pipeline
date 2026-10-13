@@ -1,21 +1,21 @@
-"""Create layout detection adapters for data snapshot extraction."""
+"""Create snapshot detector adapters for data snapshot extraction."""
 
-from data_snapshot_pipeline.detection import LayoutAdapter
+from data_snapshot_pipeline.detection import SnapshotDetector
 
 
-def create_adapter(model_name: str) -> LayoutAdapter:
-    """Create the one layout adapter selected for a pipeline run.
+def create_adapter(model_name: str) -> SnapshotDetector:
+    """Create the one snapshot detector selected for a pipeline run.
 
     Parameters
     ----------
     model_name : str
-        Adapter identifier, currently ``"doclayoutyolo"``, ``"tfid"``,
+        Extractor identifier, currently ``"doclayoutyolo"``, ``"tfid"``,
         ``"yolo11"``, or ``"yolo26"``.
 
     Returns
     -------
-    LayoutAdapter
-        Selected model adapter.
+    SnapshotDetector
+        Selected snapshot detector adapter.
 
     Raises
     ------

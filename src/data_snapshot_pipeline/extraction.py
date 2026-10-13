@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from data_snapshot_pipeline.detection import Detection, LayoutAdapter
+from data_snapshot_pipeline.detection import Detection, SnapshotDetector
 from data_snapshot_pipeline.inputs import discover_pdfs
 from data_snapshot_pipeline.naming import build_snapshot_stem
 from data_snapshot_pipeline.rendering import iter_pdf_pages
@@ -15,7 +15,7 @@ from data_snapshot_pipeline.rendering import iter_pdf_pages
 def extract_snapshots(
     input_path: str | Path,
     output_dir: str | Path,
-    adapter: LayoutAdapter,
+    detector: SnapshotDetector,
     *,
     dpi: int = 300,
     force: bool = False,
@@ -28,7 +28,7 @@ def extract_snapshots(
         One PDF file or a directory searched recursively for PDFs.
     output_dir : str | Path
         Root output directory. Images are written beneath ``snapshots``.
-    adapter : LayoutAdapter
+    detector : SnapshotDetector
         Page-image detector producing canonical detections.
     dpi : int, optional
         PyMuPDF rendering resolution in dots per inch.
@@ -68,7 +68,7 @@ def extract_snapshots(
         counters = {"figure": 0, "table": 0}
         for _, page_image in iter_pdf_pages(pdf_path, dpi=dpi):
             detections = sorted(
-                adapter.detect(page_image),
+                detector.detect(page_image),
                 key=lambda item: (
                     item.bbox[1],
                     item.bbox[0],

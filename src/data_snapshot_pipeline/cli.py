@@ -36,11 +36,11 @@ def main(argv: list[str] | None = None) -> int:
     SystemExit
         If arguments or local inputs are invalid.
     """
-    parser = _layout_parser(
+    parser = _snapshot_parser(
         "python -m data_snapshot_pipeline",
         "Extract data snapshots and Schema v1.4 metadata from PDFs.",
     )
-    return _run_layout_command(parser, argv, end_to_end=True)
+    return _run_snapshot_command(parser, argv, end_to_end=True)
 
 
 def snapshot_main(argv: list[str] | None = None) -> int:
@@ -62,11 +62,11 @@ def snapshot_main(argv: list[str] | None = None) -> int:
     SystemExit
         If arguments or local inputs are invalid.
     """
-    parser = _layout_parser(
+    parser = _snapshot_parser(
         "python -m data_snapshot_pipeline.extract_data_snapshot",
         "Extract data snapshots from PDFs without metadata extraction.",
     )
-    return _run_layout_command(parser, argv, end_to_end=False)
+    return _run_snapshot_command(parser, argv, end_to_end=False)
 
 
 def metadata_main(argv: list[str] | None = None) -> int:
@@ -133,13 +133,13 @@ def metadata_main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _layout_parser(prog: str, description: str) -> argparse.ArgumentParser:
+def _snapshot_parser(prog: str, description: str) -> argparse.ArgumentParser:
     """Build the shared PDF extraction argument parser."""
     parser = argparse.ArgumentParser(prog=prog, description=description)
     parser.add_argument(
         "--model",
         required=True,
-        help="One layout model: doclayoutyolo, tfid, yolo11, or yolo26.",
+        help="One snapshot extractor: doclayoutyolo, tfid, yolo11, or yolo26.",
     )
     parser.add_argument(
         "--input",
@@ -168,7 +168,7 @@ def _layout_parser(prog: str, description: str) -> argparse.ArgumentParser:
     return parser
 
 
-def _run_layout_command(
+def _run_snapshot_command(
     parser: argparse.ArgumentParser,
     argv: list[str] | None,
     *,
