@@ -16,25 +16,27 @@ Submission to an external dataset or service is not implemented yet.
 
 ## Installation
 
-Install only the extractor needed for a run. For example, to use TF-ID with
-metadata extraction:
+Install only the extractor needed for a run. The examples use DocLayout-YOLO
+with metadata extraction:
 
 ```bash
-uv sync --locked --extra tfid --extra metadata
+uv sync --locked --extra doclayoutyolo --extra metadata
 ```
 
-Replace `tfid` with another extractor extra when needed:
+Replace `doclayoutyolo` with another extractor extra when needed:
 
 | Extractor | Dependency extra | Model weights | Inference size |
 | --- | --- | --- | ---: |
-| `tfid` | `tfid` | `yifeihu/TF-ID-large` | Model-defined |
 | `doclayoutyolo` | `doclayoutyolo` | `juliozhao/DocLayout-YOLO-DocStructBench` | 1024 |
+| `tfid` | `tfid` | `yifeihu/TF-ID-large` | Model-defined |
 | `yolo11` | `yolo11` | `Armaggheddon/yolo11-document-layout` (`yolo11m_doc_layout.pt`) | 1280 |
 | `yolo26` | `yolo26` | `Armaggheddon/yolo26-document-layout` (`yolo26m_doc_layout.pt`) | 1280 |
 
 Dependencies are installed into `.venv/`. Model weights are downloaded on the
 first run and cached beneath `.cache/models/`; later runs reuse the cache. TF-ID
 uses a pinned model revision and stores its files beneath `.cache/models/tfid/`.
+
+See [Model selection](#model-selection) for more information.
 
 For metadata extraction, create a local environment file and add the API key:
 
@@ -59,7 +61,7 @@ Run snapshot extraction followed by metadata extraction:
 
 ```bash
 uv run python -m data_snapshot_pipeline \
-  --model=tfid \
+  --model=doclayoutyolo \
   --input=data/example.pdf
 ```
 
@@ -69,7 +71,7 @@ Run the selected extractor without making an OpenAI API request:
 
 ```bash
 uv run python -m data_snapshot_pipeline.extract_data_snapshot \
-  --model=tfid \
+  --model=doclayoutyolo \
   --input=data/example.pdf
 ```
 
@@ -79,7 +81,7 @@ Process all supported images under an extractor's snapshot directory:
 
 ```bash
 uv run python -m data_snapshot_pipeline.extract_metadata \
-  --input=output/tfid/snapshots
+  --input=output/doclayoutyolo/snapshots
 ```
 
 When the input is a file or directory named `snapshots`, metadata is written to
@@ -97,11 +99,11 @@ command to see all options.
 
 ## Outputs
 
-A TF-ID run for `example.pdf` produces this layout:
+A DocLayout-YOLO run for `example.pdf` produces this layout:
 
 ```text
 output/
-└── tfid/
+└── doclayoutyolo/
     ├── snapshots/
     │   ├── example_figure_000.png
     │   └── example_table_000.png
@@ -163,6 +165,8 @@ penalizes irrelevant detections, recall measures missed snapshots, and the
 spatial metrics measure crop alignment and completeness. These aggregate
 results are reference baselines, not a guarantee for a different document
 collection.
+
+### Other models
 
 Other data snapshot extractors can be integrated with the shipped
 `create-adapter` skill:

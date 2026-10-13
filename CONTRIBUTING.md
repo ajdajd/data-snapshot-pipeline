@@ -14,7 +14,7 @@ uv sync --locked --extra test
 Add only the extractor or metadata extras needed for the work. For example:
 
 ```bash
-uv sync --locked --extra test --extra tfid --extra metadata
+uv sync --locked --extra test --extra doclayoutyolo --extra metadata
 ```
 
 Commit `uv.lock` when dependencies change. Do not commit `.env`, model weights,
