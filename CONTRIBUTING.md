@@ -52,9 +52,14 @@ test is necessary, state that it consumes API credits before running it.
 
 ## Adding a layout adapter
 
-When it is available in your Codex environment, use the `create-adapter` skill
-to apply this repository's adapter conventions. The skill is a contributor aid,
-not a runtime dependency or a file currently shipped by this repository.
+Use the shipped `create-adapter` skill to apply this repository's adapter
+conventions:
+
+```text
+$create-adapter for {github_link}
+```
+
+The skill source is `.agents/skills/create-adapter/SKILL.md`.
 
 Whether using the skill or working manually, an adapter change must:
 

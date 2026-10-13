@@ -83,16 +83,14 @@ spatial metrics measure crop alignment and completeness. These aggregate
 results are reference baselines, not a guarantee for a different document
 collection.
 
-Other layout models can be integrated with the shipped `create-adapter` skill.
-For development tools that support `@` skill invocation, use:
+Other layout models can be integrated with the shipped `create-adapter` skill:
 
 ```text
-@create-adapter for {github_link}
+$create-adapter for {github_link}
 ```
 
-Use the equivalent skill invocation in other development tools. See
-[CONTRIBUTING.md](CONTRIBUTING.md#adding-a-layout-adapter) for the adapter
-contract and tool-agnostic development workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-layout-adapter) for the adapter
+contract.
 
 ## Usage
 
