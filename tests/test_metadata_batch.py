@@ -33,7 +33,9 @@ def test_extract_metadata_files_writes_validated_json(
     snapshot_path = tmp_path / "snapshots" / "report_table_000.png"
     snapshot_path.parent.mkdir()
     snapshot_path.write_bytes(b"image")
-    monkeypatch.setattr(batch, "extract_metadata", lambda path: _result("A title"))
+    monkeypatch.setattr(
+        batch, "extract_metadata", lambda path, **kwargs: _result("A title")
+    )
 
     paths = batch.extract_metadata_files([snapshot_path], tmp_path / "metadata")
 
@@ -83,7 +85,9 @@ def test_force_replaces_metadata_without_modifying_snapshot(
     metadata_dir.mkdir()
     snapshot_path.write_bytes(b"image")
     metadata_path.write_text('{"old": true}\n', encoding="utf-8")
-    monkeypatch.setattr(batch, "extract_metadata", lambda path: _result("New title"))
+    monkeypatch.setattr(
+        batch, "extract_metadata", lambda path, **kwargs: _result("New title")
+    )
 
     batch.extract_metadata_files(
         [snapshot_path],
@@ -115,7 +119,7 @@ def test_extraction_failure_writes_nothing(
         error_type="ValueError",
         error="Response was incomplete: max_output_tokens.",
     )
-    monkeypatch.setattr(batch, "extract_metadata", lambda path: failure)
+    monkeypatch.setattr(batch, "extract_metadata", lambda path, **kwargs: failure)
 
     with pytest.raises(RuntimeError, match="max_output_tokens"):
         batch.extract_metadata_files([snapshot_path], tmp_path / "metadata")

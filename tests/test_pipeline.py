@@ -132,19 +132,28 @@ def test_run_pipeline_extracts_metadata_for_new_snapshots(
     model_dir = tmp_path / "output" / "tfid"
     snapshot_path = model_dir / "snapshots" / "report_table_000.png"
     metadata_path = model_dir / "metadata" / "report_table_000.json"
-    calls: list[tuple[list[Path], Path]] = []
+    calls: list[tuple[list[Path], Path, str]] = []
     monkeypatch.setattr(pipeline, "create_adapter", lambda model_name: _FakeDetector())
 
     def fake_extract_metadata_files(
-        snapshot_paths: list[Path], output_dir: Path
+        snapshot_paths: list[Path],
+        output_dir: Path,
+        *,
+        metadata_provider: str,
     ) -> list[Path]:
         """Record the crops passed to the metadata stage."""
-        calls.append((snapshot_paths, output_dir))
+        calls.append((snapshot_paths, output_dir, metadata_provider))
         return [metadata_path]
 
     monkeypatch.setattr(pipeline, "extract_metadata_files", fake_extract_metadata_files)
 
-    paths = run_pipeline(pdf_path, tmp_path / "output", "tfid", dpi=72)
+    paths = run_pipeline(
+        pdf_path,
+        tmp_path / "output",
+        "tfid",
+        dpi=72,
+        metadata_provider="openai",
+    )
 
-    assert calls == [([snapshot_path], model_dir / "metadata")]
+    assert calls == [([snapshot_path], model_dir / "metadata", "openai")]
     assert paths == [snapshot_path, metadata_path]

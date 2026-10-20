@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
         "python -m data_snapshot_pipeline",
         "Extract data snapshots and Schema v1.4 metadata from PDFs.",
     )
+    _add_metadata_provider_argument(parser)
     return _run_snapshot_command(parser, argv, end_to_end=True)
 
 
@@ -112,6 +113,7 @@ def metadata_main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Replace existing metadata without modifying snapshots.",
     )
+    _add_metadata_provider_argument(parser)
     args = parser.parse_args(argv)
 
     try:
@@ -121,6 +123,7 @@ def metadata_main(argv: list[str] | None = None) -> int:
             snapshot_paths,
             output_dir,
             force=args.force,
+            metadata_provider=args.metadata_provider,
         )
     except (FileNotFoundError, ValueError) as error:
         parser.error(str(error))
@@ -168,6 +171,16 @@ def _snapshot_parser(prog: str, description: str) -> argparse.ArgumentParser:
     return parser
 
 
+def _add_metadata_provider_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the shared metadata provider option to a parser."""
+    parser.add_argument(
+        "--metadata-provider",
+        choices=("openrouter", "openai"),
+        default="openrouter",
+        help="Metadata API provider (default: openrouter).",
+    )
+
+
 def _run_snapshot_command(
     parser: argparse.ArgumentParser,
     argv: list[str] | None,
@@ -176,15 +189,24 @@ def _run_snapshot_command(
 ) -> int:
     """Run one PDF command and print its output paths."""
     args = parser.parse_args(argv)
-    operation = run_pipeline if end_to_end else run_extraction
     try:
-        paths = operation(
-            args.input,
-            args.output_dir,
-            args.model,
-            dpi=args.dpi,
-            force=args.force,
-        )
+        if end_to_end:
+            paths = run_pipeline(
+                args.input,
+                args.output_dir,
+                args.model,
+                dpi=args.dpi,
+                force=args.force,
+                metadata_provider=args.metadata_provider,
+            )
+        else:
+            paths = run_extraction(
+                args.input,
+                args.output_dir,
+                args.model,
+                dpi=args.dpi,
+                force=args.force,
+            )
     except (FileExistsError, FileNotFoundError, ValueError) as error:
         parser.error(str(error))
     except RuntimeError as error:

@@ -8,16 +8,21 @@ from data_snapshot_pipeline import cli
 
 
 @pytest.mark.parametrize(
-    ("extra_args", "expected_force"), [([], False), (["-f"], True)]
+    ("extra_args", "expected_force", "expected_provider"),
+    [
+        ([], False, "openrouter"),
+        (["-f", "--metadata-provider=openai"], True, "openai"),
+    ],
 )
 def test_main_runs_pipeline_with_defaults_and_force(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     extra_args: list[str],
     expected_force: bool,
+    expected_provider: str,
 ) -> None:
     """Forward arguments and print paths returned by the pipeline."""
-    calls: list[tuple[Path, Path, str, int, bool]] = []
+    calls: list[tuple[Path, Path, str, int, bool, str]] = []
 
     def fake_run_pipeline(
         input_path: Path,
@@ -26,9 +31,12 @@ def test_main_runs_pipeline_with_defaults_and_force(
         *,
         dpi: int,
         force: bool,
+        metadata_provider: str,
     ) -> list[Path]:
         """Record the CLI values without running a model."""
-        calls.append((input_path, output_dir, model_name, dpi, force))
+        calls.append(
+            (input_path, output_dir, model_name, dpi, force, metadata_provider)
+        )
         return [Path("output/yolo11/snapshots/example_table_000.png")]
 
     monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
@@ -43,6 +51,7 @@ def test_main_runs_pipeline_with_defaults_and_force(
             "yolo11",
             300,
             expected_force,
+            expected_provider,
         )
     ]
     assert capsys.readouterr().out == (
@@ -79,23 +88,33 @@ def test_metadata_main_infers_output_and_forwards_force(
     snapshot_path = tmp_path / "tfid" / "snapshots" / "report_table_000.png"
     snapshot_path.parent.mkdir(parents=True)
     snapshot_path.write_bytes(b"image")
-    calls: list[tuple[list[Path], Path, bool]] = []
+    calls: list[tuple[list[Path], Path, bool, str]] = []
 
     def fake_extract_metadata_files(
-        snapshot_paths: list[Path], output_dir: Path, *, force: bool
+        snapshot_paths: list[Path],
+        output_dir: Path,
+        *,
+        force: bool,
+        metadata_provider: str,
     ) -> list[Path]:
         """Record metadata command values without making an API request."""
         paths = list(snapshot_paths)
-        calls.append((paths, output_dir, force))
+        calls.append((paths, output_dir, force, metadata_provider))
         return [output_dir / "report_table_000.json"]
 
     monkeypatch.setattr(cli, "extract_metadata_files", fake_extract_metadata_files)
 
-    result = cli.metadata_main([f"--input={snapshot_path}", "--force"])
+    result = cli.metadata_main(
+        [
+            f"--input={snapshot_path}",
+            "--force",
+            "--metadata-provider=openai",
+        ]
+    )
 
     metadata_dir = tmp_path / "tfid" / "metadata"
     assert result == 0
-    assert calls == [([snapshot_path], metadata_dir, True)]
+    assert calls == [([snapshot_path], metadata_dir, True, "openai")]
     assert capsys.readouterr().out == f"{metadata_dir / 'report_table_000.json'}\n"
 
 

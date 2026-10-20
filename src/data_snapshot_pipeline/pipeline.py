@@ -69,6 +69,7 @@ def run_pipeline(
     *,
     dpi: int = 300,
     force: bool = False,
+    metadata_provider: str = "openrouter",
 ) -> list[Path]:
     """Run snapshot extraction followed by semantic metadata extraction.
 
@@ -84,6 +85,8 @@ def run_pipeline(
         PyMuPDF rendering resolution in dots per inch.
     force : bool, optional
         Replace outputs belonging to each source PDF.
+    metadata_provider : str, optional
+        API provider used for semantic metadata extraction.
 
     Returns
     -------
@@ -108,6 +111,7 @@ def run_pipeline(
     metadata_paths = extract_metadata_files(
         snapshot_paths,
         Path(output_dir) / normalized_name / "metadata",
+        metadata_provider=metadata_provider,
     )
     return [*snapshot_paths, *metadata_paths]
 

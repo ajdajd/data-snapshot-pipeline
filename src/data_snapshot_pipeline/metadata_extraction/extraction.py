@@ -15,7 +15,8 @@ from typing import Any
 from data_snapshot_pipeline.metadata_schema import DataSnapshotMetadata
 
 _PACKAGE_DIR = Path(__file__).parent
-_DEFAULT_CONFIG_PATH = _PACKAGE_DIR / "config" / "default.json"
+_CONFIG_DIR = _PACKAGE_DIR / "config"
+_DEFAULT_CONFIG_PATH = _CONFIG_DIR / "openrouter.json"
 _PROMPT_DIR = _PACKAGE_DIR / "prompts"
 _COMPLETENESS_PLACEHOLDER = "{{COMPLETENESS_GUIDANCE}}"
 _SCHEMA_PLACEHOLDER = "{{MODEL_FACING_SCHEMA_SECTION}}"
@@ -137,6 +138,30 @@ def load_extraction_config(
             f"Extraction config cannot set pipeline-owned keys: {sorted(forbidden)}."
         )
     return config
+
+
+def get_extraction_config_path(provider: str) -> Path:
+    """Return the packaged configuration for a metadata provider.
+
+    Parameters
+    ----------
+    provider : str
+        Supported metadata provider name.
+
+    Returns
+    -------
+    pathlib.Path
+        Path to the provider's packaged JSON configuration.
+
+    Raises
+    ------
+    ValueError
+        If the provider is not supported.
+    """
+    normalized_provider = provider.strip().lower()
+    if normalized_provider not in _SUPPORTED_PROVIDERS:
+        raise ValueError("Metadata provider must be 'openai' or 'openrouter'.")
+    return _CONFIG_DIR / f"{normalized_provider}.json"
 
 
 def extract_metadata(

@@ -11,6 +11,7 @@ from data_snapshot_pipeline.metadata_extraction import load_extraction_config
 from data_snapshot_pipeline.metadata_extraction.extraction import (
     _create_api_client,
     _response_format,
+    get_extraction_config_path,
 )
 
 
@@ -41,9 +42,21 @@ def _write_config(path: Path, **overrides: object) -> None:
     path.write_text(json.dumps(config), encoding="utf-8")
 
 
-def test_default_config_uses_openai_luna() -> None:
-    """Use the OpenAI Luna model and research runtime settings by default."""
+def test_default_config_uses_openrouter_luna() -> None:
+    """Use GPT-5.6 Luna through OpenRouter by default."""
     config = load_extraction_config()
+
+    assert config == {
+        "provider": "openrouter",
+        "model": "openai/gpt-5.6-luna",
+        "max_output_tokens": 25_000,
+        "timeout": 900.0,
+    }
+
+
+def test_openai_config_preserves_runtime_settings() -> None:
+    """Keep the direct OpenAI Luna request settings available."""
+    config = load_extraction_config(get_extraction_config_path("openai"))
 
     assert config["provider"] == "openai"
     assert config["model"] == "gpt-5.6-luna"

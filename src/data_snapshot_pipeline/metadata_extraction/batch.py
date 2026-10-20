@@ -5,7 +5,10 @@ from typing import Iterable
 
 from tqdm.auto import tqdm
 
-from data_snapshot_pipeline.metadata_extraction.extraction import extract_metadata
+from data_snapshot_pipeline.metadata_extraction.extraction import (
+    extract_metadata,
+    get_extraction_config_path,
+)
 
 
 def extract_metadata_files(
@@ -13,6 +16,7 @@ def extract_metadata_files(
     output_dir: str | Path,
     *,
     force: bool = False,
+    metadata_provider: str = "openrouter",
 ) -> list[Path]:
     """Extract and save metadata for snapshot images.
 
@@ -24,6 +28,8 @@ def extract_metadata_files(
         Directory for one JSON file per snapshot.
     force : bool, optional
         Delete and replace existing metadata for each snapshot.
+    metadata_provider : str, optional
+        API provider whose packaged request settings are used.
 
     Returns
     -------
@@ -36,6 +42,7 @@ def extract_metadata_files(
         If metadata extraction or validation fails for a snapshot.
     """
     metadata_dir = Path(output_dir)
+    config_path = get_extraction_config_path(metadata_provider)
     output_paths: list[Path] = []
     paths = [Path(path) for path in snapshot_paths]
 
@@ -61,7 +68,7 @@ def extract_metadata_files(
                 )
                 continue
 
-        result = extract_metadata(snapshot_path)
+        result = extract_metadata(snapshot_path, config_path=config_path)
         if result.metadata is None:
             detail = result.error or "unknown extraction error"
             raise RuntimeError(

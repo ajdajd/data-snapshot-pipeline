@@ -12,7 +12,7 @@ Submission to an external dataset or service is not implemented yet.
 
 - Python 3.10 or newer
 - [`uv`](https://docs.astral.sh/uv/)
-- An OpenAI API key and available API credits for metadata extraction
+- An OpenRouter or OpenAI API key with available credits for metadata extraction
 
 ## Installation
 
@@ -32,23 +32,31 @@ Replace `doclayoutyolo` with another extractor extra when needed:
 | `yolo11` | `yolo11` | `Armaggheddon/yolo11-document-layout` (`yolo11m_doc_layout.pt`) | 1280 |
 | `yolo26` | `yolo26` | `Armaggheddon/yolo26-document-layout` (`yolo26m_doc_layout.pt`) | 1280 |
 
-Dependencies are installed into `.venv/`. Model weights are downloaded on the
-first run and cached beneath `.cache/models/`; later runs reuse the cache. TF-ID
-uses a pinned model revision and stores its files beneath `.cache/models/tfid/`.
+Model weights are downloaded on the first run and cached beneath `.cache/models/`; later runs reuse the cache.
 
 See [Model selection](#model-selection) for more information.
 
-For metadata extraction, create a local environment file and add the API key:
+## Metadata provider
+
+OpenRouter is the default metadata provider. Create a local environment file
+and add its API key:
 
 ```bash
 cp .env.template .env
 ```
 
 ```dotenv
+OPENROUTER_API_KEY=your-api-key
+```
+
+To use OpenAI directly instead, set its key:
+
+```dotenv
 OPENAI_API_KEY=your-api-key
 ```
 
-Both `.env` and the model cache are excluded from Git.
+Both keys may be present. Select OpenAI for a command with
+`--metadata-provider=openai`; otherwise the pipeline uses OpenRouter.
 
 ## Usage
 
@@ -63,6 +71,15 @@ Run snapshot extraction followed by metadata extraction:
 uv run python -m data_snapshot_pipeline \
   --model=doclayoutyolo \
   --input=data/example.pdf
+```
+
+To use OpenAI directly for the metadata stage:
+
+```bash
+uv run python -m data_snapshot_pipeline \
+  --model=doclayoutyolo \
+  --input=data/example.pdf \
+  --metadata-provider=openai
 ```
 
 ### Snapshot extraction only
@@ -83,6 +100,9 @@ Process all supported images under an extractor's snapshot directory:
 uv run python -m data_snapshot_pipeline.extract_metadata \
   --input=output/doclayoutyolo/snapshots
 ```
+
+This command also accepts `--metadata-provider=openai`; OpenRouter is the
+default.
 
 When the input is a file or directory named `snapshots`, metadata is written to
 its sibling `metadata` directory. For images elsewhere, pass the destination
@@ -129,6 +149,22 @@ The PDF filename stem identifies all outputs belonging to that PDF.
 
 Cleanup happens before replacement work begins. If extractor inference or an API
 request later fails, the removed outputs are not restored.
+
+## Metadata extraction
+
+Metadata extraction sends each snapshot image to the selected provider's
+Responses API and validates the structured response against the canonical
+Pydantic Schema v1.4 model. Both packaged configurations use GPT-5.6 Luna:
+
+| Provider | CLI value | Configuration |
+| --- | --- | --- |
+| OpenRouter (default) | `openrouter` | [`openrouter.json`](src/data_snapshot_pipeline/metadata_extraction/config/openrouter.json) |
+| OpenAI | `openai` | [`openai.json`](src/data_snapshot_pipeline/metadata_extraction/config/openai.json) |
+
+The request uses only image-visible evidence; filenames, directory names, and
+source-document metadata are not included as evidence. Prompt files are in
+`src/data_snapshot_pipeline/metadata_extraction/prompts/`. API calls have
+automatic SDK retries disabled so a failed call is not silently repeated.
 
 ## Model selection
 
@@ -177,47 +213,6 @@ $create-adapter for {github_link}
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-data-snapshot-extractor) for the
 extractor contract.
-
-## Metadata extraction
-
-Metadata extraction sends each snapshot image to the OpenAI Responses API and
-validates the structured response against the canonical Pydantic Schema v1.4
-model. The default model is `gpt-5.6-luna`. The request uses only image-visible
-evidence; filenames, directory names, and source-document metadata are not
-included as evidence.
-
-Default request settings are in
-`src/data_snapshot_pipeline/metadata_extraction/config/default.json`. Prompt
-files are in the adjacent `prompts/` directory. API calls have automatic SDK
-retries disabled so a failed call is not silently repeated.
-
-### Using OpenRouter
-
-OpenRouter is supported through its OpenAI-compatible Responses API. Add its key
-to `.env`:
-
-```dotenv
-OPENROUTER_API_KEY=your-api-key
-```
-
-Then change `default.json` to use an OpenRouter model that supports image input
-and Structured Outputs through the Responses API:
-
-```json
-{
-  "provider": "openrouter",
-  "model": "provider/model",
-  "max_output_tokens": 25000,
-  "timeout": 900.0
-}
-```
-
-OpenRouter model capabilities and free-tier availability vary by endpoint.
-Confirm support for both image input and `structured_outputs` in the
-[OpenRouter model catalog](https://openrouter.ai/models) before selecting a
-model. Remove OpenAI-specific settings such as `service_tier`,
-`prompt_cache_key`, and `reasoning.effort` unless the selected endpoint
-explicitly supports them.
 
 ## Troubleshooting
 
