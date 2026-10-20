@@ -36,50 +36,51 @@ Model weights are downloaded on the first run and cached beneath `.cache/models/
 
 See [Model selection](#model-selection) for more information.
 
-## Metadata provider
+### Metadata API setup
 
-OpenRouter is the default metadata provider. Create a local environment file
-and add its API key:
+Required for end-to-end and metadata-only runs. Skip this step for snapshot
+extraction only.
+
+Create `.env` from the template if you have not already done so, then set the key
+for your chosen provider:
 
 ```bash
 cp .env.template .env
 ```
 
-```dotenv
-OPENROUTER_API_KEY=your-api-key
-```
+| Provider | Environment variable | CLI selection | Configuration |
+| --- | --- | --- | --- |
+| OpenRouter (default) | `OPENROUTER_API_KEY` | `--metadata-provider=openrouter` | [`openrouter.json`](src/data_snapshot_pipeline/metadata_extraction/config/openrouter.json) |
+| OpenAI | `OPENAI_API_KEY` | `--metadata-provider=openai` | [`openai.json`](src/data_snapshot_pipeline/metadata_extraction/config/openai.json) |
 
-To use OpenAI directly instead, set its key:
+Both keys may be present. Add `--metadata-provider=openai` to either command that
+extracts metadata to use OpenAI directly.
 
-```dotenv
-OPENAI_API_KEY=your-api-key
-```
-
-Both keys may be present. Select OpenAI for a command with
-`--metadata-provider=openai`; otherwise the pipeline uses OpenRouter.
+Both packaged configurations use GPT-5.6 Luna. In both end-to-end and
+metadata-only runs, each snapshot is sent to the selected provider's Responses
+API, and the structured response is validated against the canonical Pydantic
+Schema v1.4 model before saving. Requests use only image-visible evidence;
+filenames, directory names, and source-document metadata are excluded. See the
+[prompt files](src/data_snapshot_pipeline/metadata_extraction/prompts/) for the
+extraction instructions. Automatic SDK retries are disabled.
 
 ## Usage
 
-Place source PDFs beneath `data/`. Commands default to the repository-root
-`output/` directory and create a subdirectory for the selected extractor.
+Run these commands from the repository root after installation. The end-to-end
+and snapshot-only commands use one extractor selected with `--model`; `--input`
+accepts a PDF or a directory searched recursively for PDFs. Inputs may live
+anywhere; the examples use `data/`.
+
+Add `--help` to any command to see its options.
 
 ### End-to-end pipeline
 
 Run snapshot extraction followed by metadata extraction:
 
 ```bash
-uv run python -m data_snapshot_pipeline \
+uv run --no-sync python -m data_snapshot_pipeline \
   --model=doclayoutyolo \
   --input=data/example.pdf
-```
-
-To use OpenAI directly for the metadata stage:
-
-```bash
-uv run python -m data_snapshot_pipeline \
-  --model=doclayoutyolo \
-  --input=data/example.pdf \
-  --metadata-provider=openai
 ```
 
 ### Snapshot extraction only
@@ -87,39 +88,38 @@ uv run python -m data_snapshot_pipeline \
 Run the selected extractor without making a metadata API request:
 
 ```bash
-uv run python -m data_snapshot_pipeline.extract_data_snapshot \
+uv run --no-sync python -m data_snapshot_pipeline.extract_data_snapshot \
   --model=doclayoutyolo \
   --input=data/example.pdf
 ```
 
 ### Metadata extraction only
 
-Process all supported images under an extractor's snapshot directory:
+Extract metadata from existing snapshots, including after a failed metadata
+stage, without rerunning the PDF extractor:
 
 ```bash
-uv run python -m data_snapshot_pipeline.extract_metadata \
+uv run --no-sync python -m data_snapshot_pipeline.extract_metadata \
   --input=output/doclayoutyolo/snapshots
 ```
 
-This command also accepts `--metadata-provider=openai`; OpenRouter is the
-default.
-
-When the input is a file or directory named `snapshots`, metadata is written to
-its sibling `metadata` directory. For images elsewhere, pass the destination
-explicitly:
+The input may be a PNG, JPEG, GIF, or WebP image, or a directory searched
+recursively for those images. When the input directory is named `snapshots`, or
+an input image is directly inside one, the destination defaults to its sibling
+`metadata` directory. For inputs elsewhere, `--output-dir` is required:
 
 ```bash
-uv run python -m data_snapshot_pipeline.extract_metadata \
+uv run --no-sync python -m data_snapshot_pipeline.extract_metadata \
   --input=path/to/snapshot.png \
   --output-dir=path/to/metadata
 ```
 
-PDF and image directory inputs are searched recursively. Use `--help` on any
-command to see all options.
+### Output files
 
-## Outputs
-
-A DocLayout-YOLO run for `example.pdf` produces this layout:
+The end-to-end and snapshot-only commands write beneath `output/<model>/` by
+default, relative to the current working directory. Use `--output-dir` to choose
+a different output root. An end-to-end DocLayout-YOLO run for `example.pdf`
+produces files like these:
 
 ```text
 output/
@@ -133,38 +133,29 @@ output/
 ```
 
 Snapshot counters are zero-based and independent for figures and tables.
-Metadata files use the same stem as their snapshot.
+Each JSON file contains validated metadata and uses the same stem as its
+snapshot. PDF stems must be unique within a run, even across input subdirectories.
 
-## Existing outputs and `--force`
+### Rerunning and replacing outputs
 
-The PDF filename stem identifies all outputs belonging to that PDF.
+Existing outputs are identified by filename. The end-to-end and snapshot-only
+commands match files belonging to each PDF stem within the selected extractor's
+output directory; metadata-only runs check for a JSON file with the image's stem
+in the destination directory.
 
-- Snapshot-only and end-to-end commands skip a PDF when any matching snapshot
-  or metadata file already exists. They do not load the extractor for a fully
-  skipped run.
-- Adding `--force` to either PDF command deletes all matching snapshots and
-  metadata before starting the replacement extraction.
-- Metadata-only extraction skips an image whose JSON output already exists.
-  Adding `--force` replaces only that JSON file and preserves the image.
-
-Cleanup happens before replacement work begins. If extractor inference or an API
-request later fails, the removed outputs are not restored.
-
-## Metadata extraction
-
-Metadata extraction sends each snapshot image to the selected provider's
-Responses API and validates the structured response against the canonical
-Pydantic Schema v1.4 model. Both packaged configurations use GPT-5.6 Luna:
-
-| Provider | CLI value | Configuration |
+| Command | Default behavior | With `--force` (or `-f`) |
 | --- | --- | --- |
-| OpenRouter (default) | `openrouter` | [`openrouter.json`](src/data_snapshot_pipeline/metadata_extraction/config/openrouter.json) |
-| OpenAI | `openai` | [`openai.json`](src/data_snapshot_pipeline/metadata_extraction/config/openai.json) |
+| End-to-end | Skip the entire PDF if any matching snapshot or metadata exists. | Delete matching snapshots and metadata, then rerun both stages. |
+| Snapshot-only | Skip the entire PDF if any matching snapshot or metadata exists. | Delete matching snapshots and metadata, then extract snapshots only. |
+| Metadata-only | Skip images whose JSON output already exists. | Delete and regenerate each existing JSON output, preserving the images. |
 
-The request uses only image-visible evidence; filenames, directory names, and
-source-document metadata are not included as evidence. Prompt files are in
-`src/data_snapshot_pipeline/metadata_extraction/prompts/`. API calls have
-automatic SDK retries disabled so a failed call is not silently repeated.
+The end-to-end and snapshot-only commands skip partial outputs too; they do not
+resume missing metadata. Use the metadata-only command above to generate missing
+JSON files. A fully skipped run does not load the extractor.
+
+**`--force` deletes existing outputs before replacement work begins.** If
+inference or an API request fails, deleted files are not restored. This also
+applies to metadata-only replacement of an existing JSON file.
 
 ## Model selection
 
@@ -225,7 +216,7 @@ extractor contract.
   be exhausted. Retry later or add credits, then use the metadata-only command
   so the snapshot extractor does not run again.
 - **A PDF is skipped:** matching outputs already exist. Keep them, or rerun the
-  PDF command with `--force` to rebuild both stages.
+  end-to-end command with `--force` to rebuild both stages.
 
 ## Development
 
