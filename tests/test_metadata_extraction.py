@@ -50,7 +50,9 @@ def test_default_config_uses_openrouter_luna() -> None:
         "provider": "openrouter",
         "model": "openai/gpt-5.6-luna",
         "max_output_tokens": 25_000,
+        "service_tier": "flex",
         "timeout": 900.0,
+        "reasoning": {"effort": "medium"},
     }
 
 
